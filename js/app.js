@@ -5,8 +5,9 @@
 (function () {
   'use strict';
 
-  const { analyze, SCENES } = window.JournalAnalyzer;
-  const { Animator, DURATION } = window.JournalAnimator;
+  const { analyze } = window.JournalAnalyzer;
+  const { build: buildStoryboard, PLACE_ICON } = window.JournalStoryboard;
+  const { Animator } = window.JournalAnimator;
   const STORE_KEY = 'dailyreel.entries.v1';
 
   const EXAMPLES = [
@@ -41,7 +42,7 @@
   const $ = (id) => document.getElementById(id);
   const els = {
     list: $('entryList'), empty: $('emptyList'), search: $('search'), newBtn: $('newBtn'),
-    form: $('editor'), date: $('date'), text: $('text'), scene: $('sceneSelect'),
+    form: $('editor'), date: $('date'), text: $('text'),
     save: $('saveBtn'), del: $('deleteBtn'), example: $('exampleBtn'), saveState: $('saveState'),
     chips: $('chips'), mainEvent: $('mainEvent'), replay: $('replayBtn'), download: $('downloadBtn'),
     playAll: $('playAllBtn'), reelBadge: $('reelBadge'), menuBtn: $('menuBtn'), menu: $('menu'),
@@ -60,16 +61,15 @@
     const [y, m, d] = iso.split('-').map(Number);
     return new Date(y, m - 1, d).toLocaleDateString(undefined, long ? { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
   }
-  function storyFor(text, sceneOverride) {
-    const st = analyze(text);
-    st.fullText = text;
-    if (sceneOverride && SCENES[sceneOverride]) {
-      st.scene = sceneOverride;
-      st.sceneLabel = SCENES[sceneOverride].label;
-      st.sceneIcon = SCENES[sceneOverride].icon;
-    }
-    return st;
+  // The analysis names the entry in the list; the storyboard is what gets drawn, sentence by sentence.
+  function storyFor(text) {
+    const an = analyze(text);
+    const sb = buildStoryboard(text);
+    const first = sb.beats[0];
+    an.icon = sb.things[0] || (first && PLACE_ICON[first.setting]) || '✏️';
+    return { an, sb };
   }
+
   let toastTimer = 0;
   function toast(msg) {
     els.toastEl.textContent = msg; els.toastEl.hidden = false;
@@ -84,12 +84,12 @@
     const shown = q ? sorted.filter((e) => e.text.toLowerCase().includes(q) || e.date.includes(q)) : sorted;
     els.list.innerHTML = '';
     for (const e of shown) {
-      const st = storyFor(e.text, e.sceneOverride);
+      const { an: st } = storyFor(e.text);
       const li = document.createElement('li');
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'entry' + (e.id === currentId ? ' active' : '');
-      btn.innerHTML = `<span class="ico" aria-hidden="true">${st.sceneIcon}</span>
+      btn.innerHTML = `<span class="ico" aria-hidden="true">${st.icon}</span>
         <span class="meta"><span class="title">${esc(st.title)}</span><span class="when">${fmtDate(e.date)} · ${st.moodIcon} ${st.mood}</span></span>`;
       btn.addEventListener('click', () => openEntry(e.id));
       li.appendChild(btn);
@@ -100,34 +100,25 @@
     if (entries.length && !shown.length) els.empty.hidden = false;
   }
 
-  function renderStory(st, date) {
-    animator.setStory(st, { date: fmtDate(date) });
-    const chips = [
-      `${st.sceneIcon} ${st.sceneLabel}`,
-      `${st.moodIcon} ${st.mood}`,
-      `${{ morning: '🌅', day: '☀️', evening: '🌇', night: '🌙' }[st.time]} ${st.time}`
-    ];
-    if (st.people.length) chips.push(`👥 ${st.people.join(', ')}`);
-    if (st.props.length) chips.push(st.props.join(' '));
+  function renderStory(story, date) {
+    const { an, sb } = story;
+    animator.setStory(sb, { date: fmtDate(date) });
+    const n = sb.beats.length;
+    const chips = [`🎞️ ${n} panel${n === 1 ? '' : 's'}`, `📍 ${sb.places.join(', ')}`, `${an.moodIcon} ${an.mood}`];
+    if (sb.people.length) chips.push(`👥 ${sb.people.join(', ')}`);
+    if (sb.things.length) chips.push(sb.things.slice(0, 10).join(' '));
     els.chips.innerHTML = chips.map((c) => `<span class="chip">${esc(c)}</span>`).join('');
-    els.mainEvent.textContent = st.mainEvent || '—';
+    els.mainEvent.textContent = `One panel per sentence, ${Math.round(sb.duration)} seconds. Each person, action and object is drawn as its word is written.`;
   }
 
   function previewFromEditor() {
     const text = els.text.value.trim();
     if (!text) {
-      renderStory(storyFor('A quiet, ordinary day — waiting to be written.', els.scene.value || null), els.date.value);
-      els.mainEvent.textContent = 'Start writing and your animation appears here.';
+      renderStory(storyFor('I sat at my desk with a notebook and a pencil.'), els.date.value);
+      els.mainEvent.textContent = 'Start writing and your doodle appears here, one panel per sentence.';
       return;
     }
-    renderStory(storyFor(text, els.scene.value || null), els.date.value);
-  }
-
-  function fillSceneSelect() {
-    const opts = ['<option value="">Auto-detect</option>'].concat(
-      Object.entries(SCENES).map(([id, s]) => `<option value="${id}">${s.icon} ${s.label}</option>`)
-    );
-    els.scene.innerHTML = opts.join('');
+    renderStory(storyFor(text), els.date.value);
   }
 
   // ---------- actions ----------
@@ -137,7 +128,6 @@
     currentId = null;
     els.date.value = today();
     els.text.value = '';
-    els.scene.value = '';
     els.del.hidden = true;
     els.saveState.textContent = '';
     renderList();
@@ -153,7 +143,6 @@
     currentId = id;
     els.date.value = e.date;
     els.text.value = e.text;
-    els.scene.value = e.sceneOverride || '';
     els.del.hidden = false;
     els.saveState.textContent = 'Saved';
     renderList();
@@ -166,7 +155,7 @@
     const text = els.text.value.trim();
     if (!text) { toast('Write something first ✍️'); els.text.focus(); return; }
     const now = new Date().toISOString();
-    const data = { date: els.date.value || today(), text, sceneOverride: els.scene.value || null, updatedAt: now };
+    const data = { date: els.date.value || today(), text, updatedAt: now };
     if (currentId) Object.assign(entries.find((e) => e.id === currentId), data);
     else { currentId = uid(); entries.push(Object.assign({ id: currentId, createdAt: now }, data)); }
     if (persist()) { els.saveState.textContent = 'Saved'; toast('Saved — here’s your day in motion 🎬'); }
@@ -196,7 +185,6 @@
   function tryExample() {
     exampleIdx = (exampleIdx + 1) % EXAMPLES.length;
     els.text.value = EXAMPLES[exampleIdx];
-    els.scene.value = '';
     els.saveState.textContent = currentId ? 'Unsaved changes' : 'Example — save it to keep it';
     previewFromEditor();
   }
@@ -215,10 +203,10 @@
     reel.index++;
     if (reel.index >= reel.list.length) { stopReel(); toast('That’s your story so far ✨'); return; }
     const e = reel.list[reel.index];
-    renderStory(storyFor(e.text, e.sceneOverride), e.date);
+    renderStory(storyFor(e.text), e.date);
     els.reelBadge.hidden = false;
     els.reelBadge.textContent = `Reel ${reel.index + 1} / ${reel.list.length}`;
-    reel.timer = setTimeout(nextInReel, DURATION * 1000 - 50);
+    reel.timer = setTimeout(nextInReel, animator.duration * 1000 - 50);
   }
   function stopReel() {
     if (!reel) return;
@@ -285,7 +273,6 @@
 
   // ---------- wiring ----------
   if (window.DAILYREEL_EMBED) { els.download.hidden = true; els.exportBtn.hidden = true; }
-  fillSceneSelect();
   els.form.addEventListener('submit', saveEntry);
   els.newBtn.addEventListener('click', newEntry);
   els.del.addEventListener('click', deleteEntry);
@@ -294,7 +281,6 @@
   els.download.addEventListener('click', downloadVideo);
   els.playAll.addEventListener('click', playReel);
   els.search.addEventListener('input', renderList);
-  els.scene.addEventListener('change', () => { stopReel(); els.saveState.textContent = currentId ? 'Unsaved changes' : ''; previewFromEditor(); });
   els.date.addEventListener('change', () => { els.saveState.textContent = currentId ? 'Unsaved changes' : ''; previewFromEditor(); });
   els.text.addEventListener('input', () => {
     stopReel();

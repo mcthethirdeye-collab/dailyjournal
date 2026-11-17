@@ -346,719 +346,613 @@
   }
 
   // hero + companions -----------------------------------------------------
-  function heroOpts(st, extra) {
-    return Object.assign({ color: '#ff6b6b', skin: '#ffd8b1', mood: st.mood, label: 'Me', hair: '#3b2a1a' }, extra);
-  }
+  // ---------- storyboard panels ----------
+  // Each sentence of the entry is one panel. Things appear the moment their word is typed.
+  const FY = 420;                                  // where characters stand
+  const easeBack = (x) => { x = clamp(x, 0, 1); const c = 1.7; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+  const popIn = (tl, at) => easeBack((tl - at) / 0.35);
 
-  function companions(st, min = 0) {
-    const names = st.people.filter((p) => !/^(Me)$/i.test(p)).slice(0, 3);
-    while (names.length < min) names.push(min === 1 ? 'Partner' : 'Friend');
-    return names.map((label, i) => ({
-      label, color: CREW_COLORS[i % CREW_COLORS.length], skin: SKINS[(i + 1) % SKINS.length],
-      hair: ['#1d1d1d', '#a0522d', '#e8c07d', '#5a3825'][i % 4], phase: 1 + i * 1.7
-    }));
-  }
-
-  function drawCrew(ctx, st, t, xs, y, pose, extra = {}) {
-    companions(st, extra.min || 0).forEach((c, i) => {
-      if (xs[i] === undefined) return;
-      const moodC = st.mood === 'sad' || st.mood === 'angry' ? 'calm' : st.mood;
-      person(ctx, Object.assign({}, c, { x: xs[i], y, t, pose, mood: extra.mood || moodC, s: extra.s || 0.92, facing: extra.facing || -1 }));
-    });
-  }
-
-  function propBubbles(ctx, st, t, x0 = 40, y0 = 40) {
-    st.props.slice(0, 4).forEach((e, i) => {
-      const appear = ease((t - 0.8 - i * 0.5) * 2);
-      if (appear <= 0) return;
-      const bx = x0 + i * 74, by = y0 + Math.sin(t * 2 + i) * 6;
-      ctx.save();
-      ctx.globalAlpha = appear;
-      ctx.fillStyle = 'rgba(255,255,255,0.75)';
-      ctx.beginPath(); ctx.arc(bx + 30, by + 30, 30 * appear, 0, TAU); ctx.fill();
-      ctx.restore();
-      emoji(ctx, e, bx + 30, by + 32, 34 * appear, Math.sin(t * 2 + i) * 0.15, appear);
-    });
-  }
-
-  // ---------- scenes ----------
-  const scenes = {};
-
-  scenes.everyday = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t); clouds(ctx, t);
-    hills(ctx, t, '#9ad38a', 390, 30, 20, 1);
-    // houses scrolling
-    for (let i = 0; i < 6; i++) {
-      const x = wrap(i * 190 - t * 60, W + 200) - 120;
-      const hh = 70 + rnd(i) * 50;
-      ctx.fillStyle = ['#ffadad', '#ffd6a5', '#caffbf', '#9bf6ff', '#bdb2ff', '#ffc6ff'][i];
-      ctx.fillRect(x, GY - hh, 110, hh);
-      ctx.fillStyle = '#7a4e3a';
-      ctx.beginPath(); ctx.moveTo(x - 10, GY - hh); ctx.lineTo(x + 55, GY - hh - 45); ctx.lineTo(x + 120, GY - hh); ctx.fill();
-      ctx.fillStyle = st.time === 'night' ? '#ffe68a' : '#e9f6ff';
-      ctx.fillRect(x + 18, GY - hh + 18, 24, 22); ctx.fillRect(x + 68, GY - hh + 18, 24, 22);
-    }
-    ground(ctx, '#7fc96b', '#5ea54d');
-    ctx.fillStyle = '#d9c9a8'; ctx.fillRect(0, GY + 10, W, 40);
-    person(ctx, heroOpts(st, { x: 420, y: GY + 38, t, pose: 'walk' }));
-    drawCrew(ctx, st, t, [540, 610], GY + 38, 'walk', { facing: 1 });
-    propBubbles(ctx, st, t, 300, 120);
-  };
-
-  scenes.birthday = (ctx, t, st) => {
-    ctx.fillStyle = st.time === 'night' ? '#4b3f72' : '#ffe3ec'; ctx.fillRect(0, 0, W, H);
-    // window
-    ctx.save(); rrect(ctx, 700, 60, 180, 150, 10); ctx.clip(); sky(ctx, st, t); if (st.time === 'night') sunMoon(ctx, st, t, 800, 120); ctx.restore();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 8; rrect(ctx, 700, 60, 180, 150, 10); ctx.stroke();
-    // bunting
-    const cols = ['#ff595e', '#ffca3a', '#8ac926', '#1982c4', '#6a4c93'];
-    ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 30); ctx.quadraticCurveTo(340, 90, 680, 30); ctx.stroke();
-    for (let i = 0; i < 12; i++) {
-      const x = 20 + i * 55, yy = 30 + Math.sin((x / 680) * Math.PI) * 30;
-      ctx.fillStyle = cols[i % 5];
-      ctx.beginPath(); ctx.moveTo(x, yy); ctx.lineTo(x + 36, yy); ctx.lineTo(x + 18, yy + 34 + Math.sin(t * 3 + i) * 3); ctx.fill();
-    }
-    text(ctx, 'HAPPY DAY!', 340, 120, 46, '#ff4d6d', { stroke: '#fff' });
-    ctx.fillStyle = '#c99b6d'; ctx.fillRect(0, GY, W, H - GY);
-    // table + cake
-    ctx.fillStyle = '#fff'; rrect(ctx, 330, 330, 300, 30, 8); ctx.fill();
-    ctx.fillStyle = '#8b5e3c'; ctx.fillRect(350, 360, 14, 80); ctx.fillRect(596, 360, 14, 80);
-    emoji(ctx, '🎂', 480, 285, 96);
-    for (let i = 0; i < 3; i++) { // flames
-      const fx = 458 + i * 22, fy = 228 + Math.sin(t * 20 + i) * 2;
-      ctx.fillStyle = '#ffb703'; ctx.beginPath(); ctx.ellipse(fx, fy, 5, 9 + Math.sin(t * 25 + i) * 2, 0, 0, TAU); ctx.fill();
-    }
-    // balloons
-    for (let i = 0; i < 5; i++) {
-      const bx = 80 + i * 40 + Math.sin(t * 1.5 + i) * 8, by = 160 + Math.sin(t * 2 + i * 2) * 10 + i % 2 * 30;
-      ctx.strokeStyle = '#666'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx, by + 30); ctx.quadraticCurveTo(bx + 10, by + 120, 170, 330); ctx.stroke();
-      ctx.fillStyle = cols[i]; ctx.beginPath(); ctx.ellipse(bx, by, 24, 30, 0, 0, TAU); ctx.fill();
-      ctx.fillStyle = 'rgba(255,255,255,0.5)'; ctx.beginPath(); ctx.ellipse(bx - 8, by - 10, 5, 9, -0.4, 0, TAU); ctx.fill();
-    }
-    person(ctx, heroOpts(st, { x: 250, y: GY + 40, t, pose: 'jump' }));
-    drawCrew(ctx, st, t, [710, 800, 880], GY + 40, 'cheer');
-    confetti(ctx, t);
-  };
-
-  scenes.wedding = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t, 140, 90); clouds(ctx, t, 10);
-    ground(ctx, '#b5e48c', '#76c893');
-    ctx.fillStyle = '#f1e3d3'; ctx.fillRect(420, 240, W - 420, 0);
-    // arch
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 18;
-    ctx.beginPath(); ctx.moveTo(360, GY + 20); ctx.lineTo(360, 230); ctx.arc(480, 230, 120, Math.PI, 0); ctx.lineTo(600, GY + 20); ctx.stroke();
-    for (let i = 0; i < 14; i++) {
-      const a = Math.PI + (i / 13) * Math.PI;
-      emoji(ctx, i % 2 ? '🌸' : '🌹', 480 + Math.cos(a) * 120, 230 + Math.sin(a) * 120, 30);
-    }
-    const close = ease((t - 2) / 2);
-    const partner = companions(st, 1)[0];
-    person(ctx, heroOpts(st, { x: lerp(400, 455, close), y: GY + 30, t, pose: t > 4.5 ? 'cheer' : 'stand' }));
-    person(ctx, Object.assign({}, partner, { x: lerp(560, 505, close), y: GY + 30, t, pose: t > 4.5 ? 'cheer' : 'stand', mood: 'joyful', facing: -1 }));
-    if (t > 3.6) emoji(ctx, '💍', 480, 250 - ease((t - 3.6) * 2) * 40, 40, 0, ease((t - 3.6) * 2));
-    rising(ctx, t, 14, 50, (x, y, i, p) => heart(ctx, x, y, 1.4, '#ff4d6d', Math.sin(p * Math.PI)), 380, 580);
-    falling(ctx, t, 30, 50, (x, y, i) => emoji(ctx, '🌸', x, y, 16, t + i), { drift: 40 });
-    emoji(ctx, '🔔', 480, 135 + Math.sin(t * 6) * 3, 36, Math.sin(t * 6) * 0.3);
-  };
-
-  scenes.beach = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t, 720, 120); clouds(ctx, t, 14);
-    // sea
-    const seaTop = 300;
-    const g = ctx.createLinearGradient(0, seaTop, 0, 400);
-    g.addColorStop(0, '#1e88e5'); g.addColorStop(1, '#4fc3f7');
-    ctx.fillStyle = g; ctx.fillRect(0, seaTop, W, 120);
-    emoji(ctx, '⛵', wrap(100 + t * 30, W + 100) - 50, seaTop - 6, 44);
-    for (let row = 0; row < 3; row++) {
-      ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.lineWidth = 3;
-      ctx.beginPath();
-      for (let x = 0; x <= W; x += 8) ctx.lineTo(x, seaTop + 25 + row * 28 + Math.sin(x / 40 + t * 3 + row) * 4);
-      ctx.stroke();
-    }
-    // shoreline wave
-    ctx.fillStyle = '#f6e7c1';
-    ctx.beginPath(); ctx.moveTo(0, H);
-    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, 400 + Math.sin(x / 70 + t * 2) * 8 + Math.sin(t * 1.2) * 6);
-    ctx.lineTo(W, H); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.beginPath();
-    for (let x = 0; x <= W; x += 8) ctx.lineTo(x, 400 + Math.sin(x / 70 + t * 2) * 8 + Math.sin(t * 1.2) * 6);
-    ctx.stroke();
-    emoji(ctx, '🌴', 110, 330, 150);
-    emoji(ctx, '⛱️', 820, 400, 110);
-    emoji(ctx, '🐚', 640, 500, 26);
-    emoji(ctx, '🦀', wrap(t * 50, W), 515, 28);
-    for (let i = 0; i < 3; i++) emoji(ctx, '🕊️', wrap(i * 300 + t * 70, W + 100) - 50, 150 + i * 30 + Math.sin(t * 3 + i) * 10, 28);
-    const hx = lerp(260, 600, wrap(t / DUR, 1));
-    person(ctx, heroOpts(st, { x: hx, y: 480, t, pose: 'walk' }));
-    drawCrew(ctx, st, t, [hx - 80], 480, 'walk', { facing: 1 });
-    if (st.props.includes('🐕') || st.props.includes('🐶')) emoji(ctx, '🐕', hx + 80, 465 - Math.abs(Math.sin(t * 8)) * 10, 50, 0, 1, true);
-  };
-
-  scenes.rain = (ctx, t, st) => {
-    sky(ctx, st, t, ['#4a5568', '#718096', '#a0aec0']);
-    clouds(ctx, t, 10, 'rgba(90,100,120,0.95)', 6);
-    // lightning on storms
-    const flash = wrap(t, 4) < 0.12 && /storm|thunder|lightning/i.test(st.mainEvent + ' ' + (st.fullText || ''));
-    // skyline
-    for (let i = 0; i < 12; i++) {
-      const h = 80 + rnd(i) * 140, x = i * 82;
-      ctx.fillStyle = '#4a5160'; ctx.fillRect(x, GY - h, 74, h);
-      ctx.fillStyle = 'rgba(255,230,140,0.6)';
-      for (let wy = GY - h + 12; wy < GY - 14; wy += 22) for (let wx = x + 10; wx < x + 64; wx += 20) if (rnd(wx * wy) > 0.55) ctx.fillRect(wx, wy, 10, 12);
-    }
-    ground(ctx, '#3d4451', '#2d3340');
-    // puddles
-    for (let i = 0; i < 4; i++) {
-      const px = 120 + i * 230;
-      ctx.fillStyle = 'rgba(160,190,230,0.35)'; ctx.beginPath(); ctx.ellipse(px, 490, 70, 12, 0, 0, TAU); ctx.fill();
-      const r = wrap(t * 1.5 + i * 0.4, 1);
-      ctx.strokeStyle = `rgba(220,235,255,${1 - r})`; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(px + 20, 490, 30 * r + 3, 5 * r + 1, 0, 0, TAU); ctx.stroke();
-    }
-    const hx = lerp(200, 760, wrap(t / DUR, 1));
-    person(ctx, heroOpts(st, { x: hx, y: GY + 40, t, pose: 'walk', speed: 0.8 }));
-    // umbrella
-    ctx.save(); ctx.translate(hx + 14, GY - 100);
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(0, 60); ctx.stroke();
-    ctx.fillStyle = '#ff6b6b'; ctx.beginPath(); ctx.arc(0, 0, 62, Math.PI, 0);
-    for (let k = 0; k < 4; k++) ctx.quadraticCurveTo(62 - k * 31 - 15.5, -10, 62 - (k + 1) * 31, 0);
-    ctx.fill(); ctx.restore();
-    ctx.strokeStyle = 'rgba(200,220,255,0.6)'; ctx.lineWidth = 2;
-    falling(ctx, t, 160, 520, (x, y) => { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 16); ctx.stroke(); });
-    if (flash) { ctx.fillStyle = 'rgba(255,255,255,0.6)'; ctx.fillRect(0, 0, W, H); }
-  };
-
-  scenes.snow = (ctx, t, st) => {
-    sky(ctx, st, t, st.time === 'night' ? null : ['#a3c4f3', '#cfe0f7', '#eef4fb']); if (st.time === 'night') sunMoon(ctx, st, t);
-    hills(ctx, t * 0, '#e6eef8', 380, 40, 0, 2);
-    for (let i = 0; i < 7; i++) {
-      const x = 40 + i * 140 + rnd(i) * 40, h = 90 + rnd(i + 2) * 60;
-      ctx.fillStyle = '#2d6a4f';
-      for (let k = 0; k < 3; k++) { ctx.beginPath(); ctx.moveTo(x, GY - h + k * 25); ctx.lineTo(x - 34 + k * 2, GY - h + 50 + k * 28); ctx.lineTo(x + 34 - k * 2, GY - h + 50 + k * 28); ctx.fill(); }
-      ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x, GY - h); ctx.lineTo(x - 12, GY - h + 18); ctx.lineTo(x + 12, GY - h + 18); ctx.fill();
-    }
-    ground(ctx, '#ffffff', '#dbe7f5');
-    emoji(ctx, '⛄', 760, 400, 120);
-    const hx = lerp(180, 600, ease(t / 4) * 0.5 + wrap(t / DUR, 1) * 0.5);
-    person(ctx, heroOpts(st, { x: hx, y: 490, t, pose: /ski|sled/i.test(st.mainEvent) ? 'cheer' : 'walk', color: '#4361ee' }));
-    // red scarf
-    ctx.fillStyle = '#e63946'; ctx.fillRect(hx - 14, 490 - 82, 28, 7);
-    drawCrew(ctx, st, t, [hx - 90], 490, 'walk', { facing: 1 });
-    const puff = wrap(t, 1.2) / 1.2;
-    ctx.fillStyle = `rgba(255,255,255,${0.8 - puff})`; ctx.beginPath(); ctx.arc(hx + 30 + puff * 20, 490 - 100 - puff * 10, 6 + puff * 10, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#fff';
-    falling(ctx, t, 120, 70, (x, y, i) => { ctx.beginPath(); ctx.arc(x, y, 1.5 + rnd(i) * 3, 0, TAU); ctx.fill(); }, { drift: 30 });
-  };
-
-  function room(ctx, st, t, wall, floor, winX = 620) {
-    ctx.fillStyle = wall; ctx.fillRect(0, 0, W, H);
-    ctx.save(); rrect(ctx, winX, 50, 230, 170, 8); ctx.clip(); sky(ctx, st, t); sunMoon(ctx, st, t, winX + 160, 110); clouds(ctx, t, 20, undefined, 3); ctx.restore();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 10; rrect(ctx, winX, 50, 230, 170, 8); ctx.stroke();
-    ctx.lineWidth = 5; ctx.beginPath(); ctx.moveTo(winX + 115, 50); ctx.lineTo(winX + 115, 220); ctx.stroke();
-    ctx.fillStyle = floor; ctx.fillRect(0, GY - 20, W, H - GY + 20);
-  }
-
-  function clock(ctx, x, y, t, speed = 1) {
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#333'; ctx.lineWidth = 5;
-    ctx.beginPath(); ctx.arc(x, y, 38, 0, TAU); ctx.fill(); ctx.stroke();
-    ctx.lineCap = 'round';
-    const hand = (a, l, w) => { ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(a) * l, y - Math.cos(a) * l); ctx.stroke(); };
-    hand(t * speed * 0.5, 18, 5); hand(t * speed * 6, 28, 3);
-  }
-
-  function desk(ctx, x, y, w) {
-    ctx.fillStyle = '#8d6346'; ctx.fillRect(x, y, w, 18);
-    ctx.fillRect(x + 12, y + 18, 14, GY - y - 2); ctx.fillRect(x + w - 26, y + 18, 14, GY - y - 2);
-  }
-
-  scenes.work = (ctx, t, st) => {
-    room(ctx, st, t, '#dfe7ef', '#9aa5b1');
-    clock(ctx, 170, 110, t, st.mood === 'anxious' || st.mood === 'tired' ? 4 : 1);
-    // plant & board
-    emoji(ctx, '🪴', 880, 380, 80);
-    ctx.fillStyle = '#fff'; rrect(ctx, 280, 60, 260, 150, 8); ctx.fill();
-    ctx.strokeStyle = '#4d96ff'; ctx.lineWidth = 6; ctx.beginPath();
-    for (let i = 0; i <= 8; i++) ctx.lineTo(300 + i * 28, 190 - (i * 10 + Math.sin(i + t) * 10) * Math.min(1, t / 3));
-    ctx.stroke();
-    desk(ctx, 330, 330, 360);
-    person(ctx, heroOpts(st, { x: 450, y: 400, t, pose: 'type', facing: 1 }));
-    // chair
-    ctx.fillStyle = '#34495e'; ctx.fillRect(400, 374, 70, 12); ctx.fillRect(430, 386, 8, 50);
-    // laptop
-    ctx.fillStyle = '#495057'; ctx.save(); ctx.translate(560, 330); ctx.rotate(-0.15);
-    rrect(ctx, -60, -80, 110, 76, 6); ctx.fill();
-    ctx.fillStyle = '#74c0fc'; rrect(ctx, -54, -74, 98, 64, 4); ctx.fill();
-    ctx.fillStyle = '#fff'; for (let i = 0; i < 5; i++) ctx.fillRect(-48, -66 + i * 11, 30 + rnd(i + Math.floor(t * 4)) * 50, 5);
-    ctx.restore();
-    ctx.fillStyle = '#343a40'; ctx.fillRect(480, 322, 130, 8);
-    emoji(ctx, '☕', 660, 312, 36);
-    for (let i = 0; i < 3; i++) { const p = wrap(t * 0.6 + i / 3, 1); ctx.strokeStyle = `rgba(150,150,150,${1 - p})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(655 + i * 5, 295 - p * 50); ctx.quadraticCurveTo(665 + Math.sin(t * 3 + i) * 8, 280 - p * 50, 655, 265 - p * 50); ctx.stroke(); }
-    const icons = st.mood === 'anxious' || st.mood === 'angry' ? ['📧', '⚠️', '📞', '📧'] : ['📧', '✅', '💡', '👍'];
-    rising(ctx, t, 6, 60, (x, y, i, p) => emoji(ctx, icons[i % icons.length], x, y, 30, 0, Math.sin(p * Math.PI)), 300, 700);
-    drawCrew(ctx, st, t, [770, 230], GY + 30, 'stand');
-  };
-
-  scenes.study = (ctx, t, st) => {
-    room(ctx, st, t, '#f3e9dc', '#a98467', 660);
-    // bookshelf
-    ctx.fillStyle = '#7f5539'; ctx.fillRect(40, 70, 220, 300);
-    const bc = ['#e63946', '#457b9d', '#2a9d8f', '#e9c46a', '#f4a261', '#8338ec'];
-    for (let r = 0; r < 4; r++) {
-      ctx.fillStyle = '#5e3d27'; ctx.fillRect(40, 140 + r * 70, 220, 8);
-      for (let b = 0; b < 9; b++) { ctx.fillStyle = bc[(b + r) % 6]; ctx.fillRect(52 + b * 22, 90 + r * 70 - rnd(b + r * 9) * 12, 18, 50 + rnd(b + r * 9) * 12); }
-    }
-    desk(ctx, 340, 330, 340);
-    person(ctx, heroOpts(st, { x: 440, y: 400, t, pose: 'sit' }));
-    // open book with flipping page
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#999'; ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.moveTo(470, 318); ctx.lineTo(530, 312); ctx.lineTo(530, 330); ctx.lineTo(470, 334); ctx.fill(); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(530, 312); ctx.lineTo(590, 318); ctx.lineTo(590, 334); ctx.lineTo(530, 330); ctx.fill(); ctx.stroke();
-    const flip = wrap(t, 1.6) / 1.6;
-    ctx.save(); ctx.translate(530, 322); ctx.scale(Math.cos(flip * Math.PI), 1);
-    ctx.fillStyle = '#f8f9fa'; ctx.fillRect(0, -10, 56, 16); ctx.restore();
-    emoji(ctx, '✏️', 630, 318, 30, 0.5);
-    const bulb = ease((t - 4) * 2);
-    if (bulb > 0) {
-      ctx.save(); ctx.globalAlpha = bulb; ctx.fillStyle = '#fff3b0'; ctx.shadowColor = '#ffd60a'; ctx.shadowBlur = 40;
-      ctx.beginPath(); ctx.arc(440, 190, 30, 0, TAU); ctx.fill(); ctx.restore();
-      emoji(ctx, '💡', 440, 190 + Math.sin(t * 4) * 4, 50 * bulb);
-    }
-    const sym = ['A+', 'x²', '∑', 'π', '?', '!', 'ABC', '✓'];
-    rising(ctx, t, 8, 45, (x, y, i, p) => text(ctx, sym[i], x, y, 26, `rgba(80,60,140,${Math.sin(p * Math.PI)})`), 320, 700);
-    drawCrew(ctx, st, t, [780], GY + 30, 'stand');
-  };
-
-  scenes.exercise = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t); clouds(ctx, t, -40);
-    hills(ctx, t, '#a7c957', 360, 35, 40, 3);
-    for (let i = 0; i < 8; i++) {
-      const x = wrap(i * 140 - t * 260, W + 140) - 70;
-      ctx.fillStyle = '#6b4226'; ctx.fillRect(x - 6, 330, 12, 70);
-      ctx.fillStyle = '#386641'; ctx.beginPath(); ctx.arc(x, 320, 38, 0, TAU); ctx.fill();
-    }
-    ground(ctx, '#6a994e', '#386641', 400);
-    ctx.fillStyle = '#c1666b'; ctx.fillRect(0, 430, W, 60);
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.setLineDash([30, 30]); ctx.lineDashOffset = t * 400;
-    ctx.beginPath(); ctx.moveTo(0, 460); ctx.lineTo(W, 460); ctx.stroke(); ctx.setLineDash([]);
-    person(ctx, heroOpts(st, { x: 430, y: 470, t, pose: 'run', color: '#06d6a0' }));
-    drawCrew(ctx, st, t, [300, 220], 470, 'run', { facing: 1 });
-    // sweat
-    for (let i = 0; i < 3; i++) { const p = wrap(t * 2 + i / 3, 1); ctx.fillStyle = `rgba(110,190,255,${1 - p})`; ctx.beginPath(); ctx.arc(400 - p * 40, 360 + p * 20 - i * 6, 4, 0, TAU); ctx.fill(); }
-    // speed lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.7)'; ctx.lineWidth = 3;
-    for (let i = 0; i < 5; i++) { const x = wrap(500 - t * 600 + i * 200, W); ctx.beginPath(); ctx.moveTo(x, 360 + i * 16); ctx.lineTo(x + 60, 360 + i * 16); ctx.stroke(); }
-    const km = (t / DUR * 5).toFixed(1);
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; rrect(ctx, 20, 20, 140, 50, 12); ctx.fill();
-    text(ctx, `${km} km`, 90, 46, 28, '#fff');
-    if (t > DUR - 2) { const p = ease((t - (DUR - 2)) * 2); text(ctx, 'FINISH!', 480, 150, 70 * p, '#ffd60a', { stroke: '#333' }); }
-  };
-
-  scenes.sports = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t, 120, 90); clouds(ctx, t);
-    // crowd stand
-    ctx.fillStyle = '#495057'; ctx.fillRect(0, 230, W, 110);
-    for (let i = 0; i < 40; i++) {
-      const x = 12 + i * 24, y = 255 + (i % 2) * 40 - Math.abs(Math.sin(t * 5 + i)) * (t > 5 ? 10 : 3);
-      ctx.fillStyle = CREW_COLORS[i % 5]; ctx.beginPath(); ctx.arc(x, y, 9, 0, TAU); ctx.fill();
-    }
-    ctx.fillStyle = '#52b788'; ctx.fillRect(0, 340, W, H - 340);
-    for (let i = 0; i < 6; i++) { ctx.fillStyle = i % 2 ? '#40916c' : '#52b788'; ctx.fillRect(i * 160, 340, 160, H - 340); }
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; ctx.strokeRect(20, 360, W - 40, 170);
-    // goal
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 6; ctx.strokeRect(820, 320, 110, 140);
-    ctx.lineWidth = 1; for (let i = 0; i < 8; i++) { ctx.beginPath(); ctx.moveTo(820 + i * 14, 320); ctx.lineTo(820 + i * 14, 460); ctx.stroke(); }
-    const kick = ease((t - 1.5) / 2.5);
-    const bx = lerp(330, 870, kick), by = lerp(470, 390, kick) - Math.sin(kick * Math.PI) * 160;
-    const ball = st.props.find((p) => ['⚽', '🏀', '🎾'].includes(p)) || '⚽';
-    person(ctx, heroOpts(st, { x: 280, y: 490, t, pose: t > 4 ? 'cheer' : t > 1.2 ? 'stand' : 'run' }));
-    drawCrew(ctx, st, t, [180, 120], 490, t > 4 ? 'cheer' : 'stand', { facing: 1 });
-    emoji(ctx, ball, bx, by, 40, t * 8);
-    if (t > 4) { const p = ease((t - 4) * 2); text(ctx, ball === '🏀' ? 'SCORE!' : 'GOAL!', 480, 170, 90 * p, '#ffd60a', { stroke: '#222', strokeWidth: 8 }); confetti(ctx, t, 40); }
-  };
-
-  scenes.win = (ctx, t, st) => {
-    sky(ctx, st, t, ['#10002b', '#240046', '#3c096c']);
-    // spotlights
-    for (let i = 0; i < 3; i++) {
-      const a = Math.sin(t * 0.9 + i * 2) * 0.35;
-      ctx.save(); ctx.translate(160 + i * 320, 0); ctx.rotate(a);
-      const g = ctx.createLinearGradient(0, 0, 0, 500);
-      g.addColorStop(0, 'rgba(255,255,200,0.45)'); g.addColorStop(1, 'rgba(255,255,200,0)');
-      ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-15, 0); ctx.lineTo(15, 0); ctx.lineTo(140, 520); ctx.lineTo(-140, 520); ctx.fill(); ctx.restore();
-    }
-    fireworks(ctx, t);
-    // podium
-    ctx.fillStyle = '#ffd60a'; ctx.fillRect(390, 360, 180, 180);
-    ctx.fillStyle = '#adb5bd'; ctx.fillRect(220, 410, 170, 130);
-    ctx.fillStyle = '#cd7f32'; ctx.fillRect(570, 430, 170, 110);
-    text(ctx, '1', 480, 440, 64, '#7a5c00');
-    const rise = ease((t - 1) / 1.5);
-    person(ctx, heroOpts(st, { x: 480, y: 360, t, pose: t > 2.5 ? 'cheer' : 'stand' }));
-    emoji(ctx, st.props.find((p) => ['🏆', '🏅', '💰', '🎓'].includes(p)) || '🏆', 480, lerp(560, 205, rise), 64, Math.sin(t * 3) * 0.1);
-    const crew = companions(st);
-    if (crew[0]) person(ctx, Object.assign({}, crew[0], { x: 305, y: 410, t, pose: 'cheer', mood: 'excited', s: 0.9 }));
-    if (crew[1]) person(ctx, Object.assign({}, crew[1], { x: 655, y: 430, t, pose: 'cheer', mood: 'excited', s: 0.9, facing: -1 }));
-    if (t > 2.5) { const p = ease((t - 2.5) * 2); text(ctx, 'YOU DID IT!', 480, 90, 64 * p, '#ffd60a', { stroke: '#3c096c' }); }
-    confetti(ctx, t, 60);
-  };
-
-  scenes.food = (ctx, t, st) => {
-    room(ctx, st, t, st.time === 'night' || st.time === 'evening' ? '#5e3a4f' : '#ffe8d6', '#7f5539', 80);
-    // pendant lamp
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(560, 0); ctx.lineTo(560, 120); ctx.stroke();
-    ctx.fillStyle = '#ffb703'; ctx.beginPath(); ctx.moveTo(520, 160); ctx.lineTo(600, 160); ctx.lineTo(580, 120); ctx.lineTo(540, 120); ctx.fill();
-    ctx.save(); ctx.globalAlpha = 0.2 + Math.sin(t * 2) * 0.03; ctx.fillStyle = '#ffe066';
-    ctx.beginPath(); ctx.moveTo(520, 160); ctx.lineTo(600, 160); ctx.lineTo(760, 360); ctx.lineTo(360, 360); ctx.fill(); ctx.restore();
-    const crew = companions(st);
-    // diners behind table
-    if (crew[1]) person(ctx, Object.assign({}, crew[1], { x: 565, y: 345, t, pose: 'sit', mood: 'joyful', s: 0.85 }));
-    person(ctx, heroOpts(st, { x: 420, y: 358, t, pose: 'sit' }));
-    if (crew[0]) person(ctx, Object.assign({}, crew[0], { x: 710, y: 358, t, pose: 'sit', mood: 'joyful', facing: -1 }));
-    // table
-    ctx.fillStyle = '#fff'; rrect(ctx, 330, 340, 460, 30, 6); ctx.fill();
-    ctx.fillStyle = '#e63946'; for (let i = 0; i < 8; i++) ctx.fillRect(330 + i * 60, 370, 30, 40);
-    ctx.fillStyle = '#f1faee'; for (let i = 0; i < 8; i++) ctx.fillRect(360 + i * 60, 370, 30, 40);
-    const foods = st.props.filter((p) => !['☕'].includes(p) || st.props.length === 1);
-    const dishes = foods.length ? foods : ['🍝'];
-    const plateX = [450, 670, 560];
-    plateX.forEach((px, i) => {
-      ctx.fillStyle = '#fff'; ctx.strokeStyle = '#ccc'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(px, 338, 48, 12, 0, 0, TAU); ctx.fill(); ctx.stroke();
-      emoji(ctx, dishes[i % dishes.length], px, 316, 46);
-      for (let k = 0; k < 2; k++) { const p = wrap(t * 0.5 + k / 2 + i * 0.3, 1); ctx.strokeStyle = `rgba(255,255,255,${0.8 * (1 - p)})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(px - 10 + k * 20, 290 - p * 60); ctx.quadraticCurveTo(px + Math.sin(t * 3 + k) * 12, 270 - p * 60, px - 10 + k * 20, 250 - p * 60); ctx.stroke(); }
-    });
-    if (wrap(t, 3) > 1.5) { ctx.fillStyle = '#fff'; rrect(ctx, 330, 190, 110, 44, 20); ctx.fill(); text(ctx, 'Mmm!', 385, 213, 26, '#e63946'); }
-    rising(ctx, t, 6, 40, (x, y, i, p) => heart(ctx, x, y, 1.2, '#ff8fa3', Math.sin(p * Math.PI) * 0.8), 360, 760);
-  };
-
-  scenes.music = (ctx, t, st) => {
-    sky(ctx, st, t, ['#03001c', '#1b1a55', '#301e67']);
-    const cols = ['#f72585', '#4cc9f0', '#b5179e', '#7209b7', '#ffd60a'];
-    for (let i = 0; i < 4; i++) {
-      const a = Math.sin(t * 1.6 + i * 1.3) * 0.5;
-      ctx.save(); ctx.translate(120 + i * 240, 0); ctx.rotate(a);
-      ctx.globalAlpha = 0.28; ctx.fillStyle = cols[i]; ctx.beginPath(); ctx.moveTo(-10, 0); ctx.lineTo(10, 0); ctx.lineTo(120, 440); ctx.lineTo(-120, 440); ctx.fill(); ctx.restore();
-    }
-    // stage
-    ctx.fillStyle = '#212529'; ctx.fillRect(140, 360, 680, 40);
-    ctx.fillStyle = '#343a40'; ctx.fillRect(160, 230, 70, 130); ctx.fillRect(730, 230, 70, 130);
-    [195, 765].forEach((x) => { const pulse = 1 + Math.abs(Math.sin(t * 8)) * 0.12; ctx.fillStyle = '#111'; ctx.beginPath(); ctx.arc(x, 290, 24 * pulse, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(x, 250, 12 * pulse, 0, TAU); ctx.fill(); });
-    const performing = /sang|sing|play|perform|karaoke|band|guitar|piano|dj/i.test(st.mainEvent);
-    person(ctx, heroOpts(st, { x: 480, y: 365, t, pose: performing ? 'jump' : 'cheer', speed: 1.4 }));
-    if (performing) emoji(ctx, st.props.find((p) => ['🎸', '🎹', '🎧'].includes(p)) || '🎤', 500, 300 + Math.sin(t * 9) * 4, 50, -0.4);
-    const notes = ['♪', '♫', '♬', '♩'];
-    rising(ctx, t, 12, 70, (x, y, i, p) => text(ctx, notes[i % 4], x, y, 34, cols[i % 5], { weight: 700 }), 200, 760);
-    // crowd
-    for (let i = 0; i < 22; i++) {
-      const x = i * 46 + 10, y = 470 - Math.abs(Math.sin(t * 6 + i * 0.8)) * 14;
-      ctx.fillStyle = '#0d0d0d'; ctx.beginPath(); ctx.arc(x, y, 22, 0, TAU); ctx.fill(); ctx.fillRect(x - 24, y + 14, 48, 80);
-      if (i % 4 === 0) { ctx.strokeStyle = '#0d0d0d'; ctx.lineWidth = 8; ctx.beginPath(); ctx.moveTo(x + 15, y + 10); ctx.lineTo(x + 26, y - 40 + Math.sin(t * 6 + i) * 8); ctx.stroke(); }
-    }
-    if (!performing) { const crew = companions(st); crew.slice(0, 2).forEach((c, i) => person(ctx, Object.assign({}, c, { x: 300 + i * 360, y: 535, t, pose: 'cheer', mood: 'excited', s: 0.9 }))); }
-  };
-
-  scenes.travel = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t, 150, 100);
-    clouds(ctx, t, -60, undefined, 6);
-    hills(ctx, t, '#80b918', 420, 40, 30, 1);
-    hills(ctx, t, '#55a630', 460, 30, 60, 4);
-    // landmark silhouettes
-    ctx.fillStyle = 'rgba(40,40,70,0.35)';
-    const lx = 700;
-    ctx.beginPath(); ctx.moveTo(lx, 400); ctx.lineTo(lx + 30, 240); ctx.lineTo(lx + 36, 200); ctx.lineTo(lx + 42, 240); ctx.lineTo(lx + 72, 400); ctx.fill();
-    ctx.fillRect(lx + 100, 300, 50, 100); ctx.beginPath(); ctx.arc(lx + 125, 300, 25, Math.PI, 0); ctx.fill();
-    // plane with contrail
-    const p = wrap(t / DUR, 1);
-    const px = lerp(-120, W + 120, p), py = 170 - Math.sin(p * Math.PI) * 60;
-    ctx.strokeStyle = 'rgba(255,255,255,0.8)'; ctx.lineWidth = 6; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.moveTo(px - 30, py + 6);
-    for (let k = 1; k < 30; k++) { const q = p - k * 0.008; ctx.lineTo(lerp(-120, W + 120, q) - 30, 170 - Math.sin(q * Math.PI) * 60 + 6); }
-    ctx.stroke();
-    // the ✈️ glyph points north-east, so +45° makes it face right; then follow the climb/descent
-    const slope = Math.atan2(-Math.cos(p * Math.PI) * 60 * Math.PI, W + 240);
-    emoji(ctx, '✈️', px, py, 70, Math.PI / 4 + slope);
-    ground(ctx, '#d4a373', '#bc8a5f', 470);
-    person(ctx, heroOpts(st, { x: 360, y: 492, t, pose: 'wave' }));
-    emoji(ctx, '🧳', 412, 468, 44);
-    drawCrew(ctx, st, t, [270], 492, 'wave', { facing: 1 });
-    emoji(ctx, '📍', 736, 175 + Math.sin(t * 3) * 6, 44);
-    propBubbles(ctx, st, t, 520, 30);
-  };
-
-  scenes.roadtrip = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t); clouds(ctx, t, -20);
-    hills(ctx, t, '#99d98c', 360, 50, 30, 2);
-    hills(ctx, t, '#76c893', 400, 30, 80, 5);
-    for (let i = 0; i < 5; i++) {
-      const x = wrap(i * 260 - t * 300, W + 260) - 130;
-      ctx.fillStyle = '#6c757d'; ctx.fillRect(x, 330, 6, 80);
-      ctx.fillStyle = '#2d6a4f'; rrect(ctx, x - 40, 300, 86, 40, 6); ctx.fill();
-      text(ctx, ['→ Fun', 'Home ←', 'Sea →', 'City', 'Trip!'][i], x + 3, 320, 16, '#fff');
-    }
-    ctx.fillStyle = '#495057'; ctx.fillRect(0, 410, W, 100);
-    ctx.strokeStyle = '#ffd60a'; ctx.lineWidth = 6; ctx.setLineDash([40, 40]); ctx.lineDashOffset = t * 500;
-    ctx.beginPath(); ctx.moveTo(0, 460); ctx.lineTo(W, 460); ctx.stroke(); ctx.setLineDash([]);
-    ground(ctx, '#74c69d', '#52b788', 510);
-    // car
-    const cx = 430, cy = 440 + Math.sin(t * 14) * 2;
-    ctx.fillStyle = '#ef476f'; rrect(ctx, cx - 120, cy - 40, 240, 50, 16); ctx.fill();
-    rrect(ctx, cx - 70, cy - 85, 140, 50, 18); ctx.fill();
-    ctx.fillStyle = '#bde0fe'; rrect(ctx, cx - 58, cy - 78, 56, 38, 6); ctx.fill(); rrect(ctx, cx + 4, cy - 78, 56, 38, 6); ctx.fill();
-    // heads in windows
-    ctx.fillStyle = '#ffd8b1'; ctx.beginPath(); ctx.arc(cx + 32, cy - 56, 13, 0, TAU); ctx.fill();
-    ctx.save(); ctx.translate(cx + 34, cy - 54); ctx.scale(0.55, 0.55); face(ctx, 0, 0, st.mood, t); ctx.restore();
-    if (st.people.length) { ctx.fillStyle = SKINS[2]; ctx.beginPath(); ctx.arc(cx - 30, cy - 56, 13, 0, TAU); ctx.fill(); }
-    ctx.fillStyle = '#ffd166'; ctx.beginPath(); ctx.arc(cx + 116, cy - 22, 8, 0, TAU); ctx.fill();
-    [cx - 70, cx + 70].forEach((wx) => {
-      ctx.fillStyle = '#212529'; ctx.beginPath(); ctx.arc(wx, cy + 12, 26, 0, TAU); ctx.fill();
-      ctx.save(); ctx.translate(wx, cy + 12); ctx.rotate(t * 12); ctx.strokeStyle = '#adb5bd'; ctx.lineWidth = 4;
-      for (let k = 0; k < 3; k++) { ctx.rotate(TAU / 3); ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(16, 0); ctx.stroke(); }
-      ctx.restore();
-    });
-    for (let i = 0; i < 4; i++) { const p = wrap(t * 2 + i / 4, 1); ctx.fillStyle = `rgba(200,200,200,${0.6 * (1 - p)})`; ctx.beginPath(); ctx.arc(cx - 130 - p * 80, cy + 6 - p * 10, 8 + p * 14, 0, TAU); ctx.fill(); }
-    if (st.time === 'evening' || st.time === 'night') { const g = ctx.createRadialGradient(cx + 120, cy - 20, 0, cx + 220, cy, 160); g.addColorStop(0, 'rgba(255,240,180,0.6)'); g.addColorStop(1, 'rgba(255,240,180,0)'); ctx.fillStyle = g; ctx.fillRect(cx + 110, cy - 120, 300, 260); }
-    text(ctx, '♪', cx + 90 + Math.sin(t * 3) * 10, cy - 110 - wrap(t * 30, 40), 30, '#fff');
-  };
-
-  scenes.love = (ctx, t, st) => {
-    const s2 = Object.assign({}, st, { time: st.time === 'day' ? 'evening' : st.time });
-    sky(ctx, s2, t); sunMoon(ctx, s2, t, 480, 160);
-    hills(ctx, 0, '#4f772d', 380, 25, 0, 6);
-    ground(ctx, '#90a955', '#4f772d', 400);
-    // lamp post
-    ctx.fillStyle = '#343a40'; ctx.fillRect(170, 200, 10, 250);
-    ctx.fillStyle = '#ffe066'; ctx.shadowColor = '#ffe066'; ctx.shadowBlur = 30; ctx.beginPath(); ctx.arc(175, 195, 16, 0, TAU); ctx.fill(); ctx.shadowBlur = 0;
-    // bench
-    ctx.fillStyle = '#9c6644'; ctx.fillRect(360, 390, 240, 14); ctx.fillRect(360, 350, 240, 12);
-    ctx.fillStyle = '#5c3d2e'; ctx.fillRect(375, 404, 10, 40); ctx.fillRect(575, 404, 10, 40);
-    const close = ease((t - 1.5) / 2.5);
-    const partner = companions(st, 1)[0];
-    person(ctx, heroOpts(st, { x: lerp(330, 445, close), y: 450, t, pose: t > 4 ? 'stand' : 'walk' }));
-    person(ctx, Object.assign({}, partner, { x: lerp(640, 520, close), y: 450, t, pose: t > 4 ? 'stand' : 'walk', mood: 'joyful', facing: -1 }));
-    if (t > 4) {
-      const p = ease((t - 4) * 1.5);
-      heart(ctx, 482, 270 - p * 30, 3.5 * p, '#ff4d6d');
-    }
-    rising(ctx, t, 18, 40, (x, y, i, p) => heart(ctx, x, y, 0.8 + rnd(i) * 1.2, ['#ff4d6d', '#ff8fa3', '#ffccd5'][i % 3], Math.sin(p * Math.PI)), 260, 700);
-    for (let i = 0; i < 15; i++) { ctx.fillStyle = `rgba(255,255,160,${Math.abs(Math.sin(t * 2 + i))})`; ctx.beginPath(); ctx.arc(rnd(i) * W, 250 + rnd(i + 3) * 150 + Math.sin(t + i) * 10, 3, 0, TAU); ctx.fill(); }
-  };
-
-  scenes.pet = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t); clouds(ctx, t);
-    hills(ctx, 0, '#95d5b2', 380, 30, 0, 3);
-    ground(ctx, '#74c69d', '#40916c', 400);
-    for (let i = 0; i < 30; i++) emoji(ctx, i % 3 ? '🌼' : '🌷', rnd(i) * W, 420 + rnd(i + 4) * 110, 18);
-    emoji(ctx, '🌳', 830, 300, 200);
-    const isCat = st.props.some((p) => p === '🐈' || p === '🐱') && !st.props.some((p) => p === '🐕' || p === '🐶');
-    const pet = isCat ? '🐈' : '🐕';
-    const toy = isCat ? '🧶' : '🎾';
-    const cyc = wrap(t, 4) / 4;              // throw → fetch → return
-    const throwP = clamp(cyc / 0.35, 0, 1);
-    const ballX = lerp(300, 720, ease(throwP));
-    const ballY = 430 - Math.sin(throwP * Math.PI) * 220;
-    const petGoing = cyc < 0.5;
-    const petX = petGoing ? lerp(340, 700, ease(cyc / 0.5)) : lerp(700, 340, ease((cyc - 0.5) / 0.5));
-    person(ctx, heroOpts(st, { x: 260, y: 470, t, pose: cyc < 0.1 ? 'wave' : 'cheer' }));
-    drawCrew(ctx, st, t, [160], 470, 'stand', { facing: 1 });
-    if (cyc < 0.5) emoji(ctx, toy, ballX, ballY, 32, t * 6);
-    const hop = Math.abs(Math.sin(t * 14)) * 14;
-    emoji(ctx, pet, petX, 460 - hop, 72, 0, 1, petGoing);
-    if (!petGoing) emoji(ctx, toy, petX + (petGoing ? 30 : -30), 452 - hop, 22);
-    if (cyc > 0.85) heart(ctx, 300, 330 - (cyc - 0.85) * 300, 2, '#ff4d6d', 1 - (cyc - 0.85) * 6);
-  };
-
-  scenes.nature = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t, 160, 100); clouds(ctx, t, 12);
-    // mountains
-    const mtn = (x, h, w, c, snow) => {
-      ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(x - w, GY); ctx.lineTo(x, GY - h); ctx.lineTo(x + w, GY); ctx.fill();
-      if (snow) { ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(x, GY - h); ctx.lineTo(x - w * 0.22, GY - h * 0.78); ctx.lineTo(x - w * 0.08, GY - h * 0.82); ctx.lineTo(x + w * 0.06, GY - h * 0.76); ctx.lineTo(x + w * 0.22, GY - h * 0.78); ctx.fill(); }
-    };
-    mtn(250, 260, 300, '#6c757d', true); mtn(820, 230, 260, '#868e96', true);
-    // climbable mountain
-    mtn(560, 330, 330, '#588157', false);
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.moveTo(560, GY - 330); ctx.lineTo(530, GY - 290); ctx.lineTo(590, GY - 290); ctx.fill();
-    // flag at summit
-    ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(560, GY - 330); ctx.lineTo(560, GY - 390); ctx.stroke();
-    ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.moveTo(560, GY - 390); ctx.quadraticCurveTo(585, GY - 385 + Math.sin(t * 6) * 5, 605, GY - 380); ctx.lineTo(560, GY - 365); ctx.fill();
-    ground(ctx, '#a3b18a', '#588157');
-    for (let i = 0; i < 9; i++) emoji(ctx, '🌲', 30 + i * 115 + rnd(i) * 30, GY + 20 + rnd(i + 2) * 50, 60 + rnd(i) * 30);
-    // hero climbs the slope (left side: from (260,GY) to summit (560, GY-330))
-    const p = ease(clamp(t / (DUR * 0.7), 0, 1));
-    const hx = lerp(260, 552, p), hy = lerp(GY + 2, GY - 326, p);
-    const atTop = p >= 0.999;
-    person(ctx, heroOpts(st, { x: hx, y: hy, t, pose: atTop ? 'cheer' : 'walk', s: 0.55 }));
-    const crew = companions(st);
-    if (crew[0]) { const q = ease(clamp((t - 0.6) / (DUR * 0.7), 0, 1)); person(ctx, Object.assign({}, crew[0], { x: lerp(230, 530, q), y: lerp(GY + 2, GY - 296, q), t, pose: q >= 0.999 ? 'cheer' : 'walk', s: 0.5, label: crew[0].label })); }
-    for (let i = 0; i < 3; i++) { const bx = wrap(i * 350 + t * 50, W + 60) - 30, by = 120 + i * 25 + Math.sin(t * 2 + i) * 8; ctx.strokeStyle = '#333'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(bx - 10, by); ctx.quadraticCurveTo(bx - 5, by - 8 * Math.abs(Math.sin(t * 6 + i)), bx, by); ctx.quadraticCurveTo(bx + 5, by - 8 * Math.abs(Math.sin(t * 6 + i)), bx + 10, by); ctx.stroke(); }
-    if (atTop) { const q = ease((t - DUR * 0.7) * 2); text(ctx, 'Made it!', 560, 40 + q * 10, 46 * q, '#fff', { stroke: '#344e41' }); }
-  };
-
-  function bedroom(ctx, st, t) {
-    room(ctx, st, t, '#cdb4db', '#a26769', 600);
-    ctx.fillStyle = '#6d4c41'; ctx.fillRect(120, 300, 30, 140); ctx.fillRect(560, 340, 24, 100);
-    ctx.fillStyle = '#fff'; rrect(ctx, 140, 330, 430, 60, 10); ctx.fill();
-    ctx.fillStyle = '#f8f9fa'; rrect(ctx, 160, 300, 110, 40, 16); ctx.fill();
-  }
-
-  scenes.sick = (ctx, t, st) => {
-    bedroom(ctx, st, t);
-    ctx.save(); ctx.translate(330, 322); ctx.rotate(-Math.PI / 2);
-    person(ctx, heroOpts(st, { x: 0, y: 0, t, pose: 'stand', mood: st.mood === 'joyful' || st.mood === 'excited' ? 'calm' : 'tired', label: null, s: 0.95 }));
-    ctx.restore();
-    // blanket
-    ctx.fillStyle = '#90caf9'; rrect(ctx, 260, 320 + Math.sin(t * 2) * 2, 300, 60, 18); ctx.fill();
-    emoji(ctx, '🌡️', 200, 268, 34, -0.8);
-    // nightstand
-    ctx.fillStyle = '#8d6346'; ctx.fillRect(640, 340, 120, 100);
-    emoji(ctx, '💊', 670, 322, 30); emoji(ctx, '🍵', 720, 318, 36); emoji(ctx, '🧻', 860, 410, 50);
-    const sneeze = wrap(t, 4) > 3 && wrap(t, 4) < 3.8;
-    if (sneeze) text(ctx, 'ACHOO!', 330, 210, 44, '#fff', { stroke: '#7b2cbf' });
-    else rising(ctx, t, 4, 30, (x, y, i, p) => text(ctx, 'z', x, y, 22 + i * 6, `rgba(255,255,255,${Math.sin(p * Math.PI)})`), 230, 320);
-    drawCrew(ctx, st, t, [820], GY + 30, 'stand');
-    rising(ctx, t, 5, 35, (x, y, i, p) => heart(ctx, x, y, 1, '#ff8fa3', Math.sin(p * Math.PI) * 0.7), 600, 900);
-  };
-
-  scenes.rest = (ctx, t, st) => {
-    const s2 = Object.assign({}, st, { time: st.time === 'day' ? 'evening' : st.time });
-    const sleeping = /sleep|slept|nap|bed/i.test(st.mainEvent);
-    if (sleeping) {
-      bedroom(ctx, s2, t);
-      ctx.save(); ctx.translate(330, 322); ctx.rotate(-Math.PI / 2);
-      person(ctx, heroOpts(st, { x: 0, y: 0, t, pose: 'stand', mood: 'calm', label: null, s: 0.95 })); ctx.restore();
-      ctx.fillStyle = '#ffafcc'; rrect(ctx, 260, 320 + Math.sin(t * 1.5) * 3, 300, 60, 18); ctx.fill();
-      rising(ctx, t, 5, 25, (x, y, i, p) => text(ctx, 'Z', x, y, 24 + i * 8, `rgba(255,255,255,${Math.sin(p * Math.PI)})`), 240, 360);
-      emoji(ctx, '🧸', 520, 300, 46);
-      return;
-    }
-    room(ctx, s2, t, '#22223b', '#4a4e69', 640);
-    // TV glow
-    const flick = 0.6 + Math.sin(t * 11) * 0.1 + Math.sin(t * 3.7) * 0.1;
-    ctx.fillStyle = '#111'; rrect(ctx, 60, 120, 260, 160, 8); ctx.fill();
-    const tvc = ['#4cc9f0', '#f72585', '#ffd60a', '#80ffdb'][Math.floor(t / 1.3) % 4];
-    ctx.fillStyle = tvc; ctx.globalAlpha = flick; ctx.fillRect(72, 132, 236, 136); ctx.globalAlpha = 1;
-    emoji(ctx, ['🦖', '🚀', '🦸', '👻'][Math.floor(t / 1.3) % 4], 190, 200, 70);
-    ctx.save(); ctx.globalAlpha = 0.12 * flick; ctx.fillStyle = tvc; ctx.beginPath(); ctx.moveTo(320, 120); ctx.lineTo(W, 60); ctx.lineTo(W, 520); ctx.lineTo(320, 280); ctx.fill(); ctx.restore();
-    ctx.fillStyle = '#333'; ctx.fillRect(170, 280, 40, 160);
-    // sofa
-    ctx.fillStyle = '#9a8c98'; rrect(ctx, 420, 300, 400, 80, 24); ctx.fill();
-    person(ctx, heroOpts(st, { x: 560, y: 400, t, pose: 'sit', facing: -1, speed: 0.3 }));
-    drawCrew(ctx, st, t, [680], 400, 'sit', { facing: -1, s: 0.92 });
-    ctx.fillStyle = '#c9ada7'; rrect(ctx, 400, 360, 440, 70, 24); ctx.fill();
-    rrect(ctx, 390, 320, 50, 100, 20); ctx.fill(); rrect(ctx, 800, 320, 50, 100, 20); ctx.fill();
-    emoji(ctx, '🍿', 470, 340, 40);
-    emoji(ctx, '🛋️', -100, -100, 1);
-    if (st.mood === 'tired') rising(ctx, t, 3, 20, (x, y, i, p) => text(ctx, 'z', x, y, 20 + i * 6, `rgba(255,255,255,${Math.sin(p * Math.PI)})`), 540, 600);
-  };
-
-  scenes.friends = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t); clouds(ctx, t);
-    hills(ctx, 0, '#b7e4c7', 380, 25, 0, 7);
-    ground(ctx, '#95d5b2', '#52b788', 400);
-    // picnic blanket
-    ctx.fillStyle = '#e63946'; ctx.beginPath(); ctx.ellipse(480, 470, 260, 40, 0, 0, TAU); ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 4; for (let i = -4; i <= 4; i++) { ctx.beginPath(); ctx.moveTo(480 + i * 55, 432); ctx.lineTo(480 + i * 55, 508); ctx.stroke(); }
-    const crew = companions(st, 2);
-    const xs = [380, 560, 650, 250];
-    person(ctx, heroOpts(st, { x: 470, y: 470, t, pose: wrap(t, 2.4) < 1.2 ? 'cheer' : 'stand' }));
-    crew.forEach((c, i) => person(ctx, Object.assign({}, c, { x: xs[(i + 1) % 4] === 470 ? 300 : [330, 610, 720][i], y: 470, t, pose: wrap(t + i, 2.4) < 1.2 ? 'stand' : 'cheer', mood: st.mood === 'sad' ? 'calm' : 'joyful', facing: i === 0 ? 1 : -1 })));
-    const bubbles = ['😂', '❤️', '🎉', '🙌', '😄'];
-    const k = Math.floor(t / 1.6);
-    const who = [470, 330, 610, 720][k % (crew.length + 1)];
-    const p = ease(wrap(t, 1.6) * 3);
-    ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(who + 40, 300, 30 * p, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(who + 20, 320); ctx.lineTo(who + 10, 345); ctx.lineTo(who + 35, 325); ctx.fill();
-    emoji(ctx, bubbles[k % bubbles.length], who + 40, 302, 34 * p);
-    propBubbles(ctx, st, t, 40, 30);
-  };
-
-  scenes.gaming = (ctx, t, st) => {
-    ctx.fillStyle = '#10002b'; ctx.fillRect(0, 0, W, H);
-    // monitor
-    ctx.fillStyle = '#000'; rrect(ctx, 260, 50, 440, 260, 12); ctx.fill();
-    ctx.save(); rrect(ctx, 275, 65, 410, 230, 6); ctx.clip();
-    ctx.fillStyle = '#5390d9'; ctx.fillRect(275, 65, 410, 230);
-    ctx.fillStyle = '#80ed99'; ctx.fillRect(275, 255, 410, 40);
-    for (let i = 0; i < 6; i++) { const bx = wrap(i * 90 - t * 160, 500) + 260; ctx.fillStyle = '#f77f00'; ctx.fillRect(bx, 255 - (i % 3) * 30 - 30, 30, 30); }
-    const jy = 225 - Math.abs(Math.sin(t * 3)) * 70;
-    ctx.fillStyle = '#e63946'; ctx.fillRect(360, jy, 26, 30);
-    for (let i = 0; i < 5; i++) { const cx = wrap(i * 100 - t * 160, 500) + 275; emoji(ctx, '🪙', cx, 130 + (i % 2) * 30, 22); }
-    text(ctx, `SCORE ${String(Math.floor(t * 1250)).padStart(5, '0')}`, 480, 85, 18, '#fff', { family: 'monospace' });
-    ctx.restore();
-    ctx.fillStyle = '#3c096c'; ctx.fillRect(460, 310, 40, 40);
-    ctx.save(); ctx.globalAlpha = 0.18 + Math.sin(t * 8) * 0.04; ctx.fillStyle = '#4cc9f0'; ctx.beginPath(); ctx.moveTo(275, 300); ctx.lineTo(685, 300); ctx.lineTo(900, H); ctx.lineTo(60, H); ctx.fill(); ctx.restore();
-    ctx.fillStyle = '#240046'; ctx.fillRect(0, GY, W, H - GY);
-    // gamer chair & hero (seen from behind-ish)
-    person(ctx, heroOpts(st, { x: 440, y: 470, t, pose: 'type', facing: 1 }));
-    emoji(ctx, '🎮', 485, 420 + Math.sin(t * 10) * 3, 40);
-    drawCrew(ctx, st, t, [640], 470, 'type', { facing: -1 });
-    if (t > DUR - 2.5) { const p = ease((t - (DUR - 2.5)) * 2); text(ctx, 'LEVEL UP!', 480, 180, 60 * p, '#ffd60a', { stroke: '#3c096c' }); }
-  };
-
-  scenes.shopping = (ctx, t, st) => {
-    sky(ctx, st, t); sunMoon(ctx, st, t); clouds(ctx, t);
-    const shops = [['#ff6b6b', '👗'], ['#4d96ff', '👟'], ['#6bcB77', '🥦'], ['#ffd93d', '📚'], ['#c77dff', '🎁'], ['#ff9f1c', '☕']];
-    for (let i = 0; i < 6; i++) {
-      const x = wrap(i * 200 - t * 50, 1200) - 120;
-      ctx.fillStyle = '#f8f9fa'; ctx.fillRect(x, 170, 180, 270);
-      ctx.fillStyle = shops[i][0];
-      for (let k = 0; k < 6; k++) { ctx.fillStyle = k % 2 ? '#fff' : shops[i][0]; ctx.beginPath(); ctx.moveTo(x + k * 30, 200); ctx.lineTo(x + k * 30 + 30, 200); ctx.lineTo(x + k * 30 + 30, 230); ctx.arc(x + k * 30 + 15, 230, 15, 0, Math.PI); ctx.fill(); }
-      ctx.fillStyle = shops[i][0]; ctx.fillRect(x, 170, 180, 30);
-      ctx.fillStyle = '#bde0fe'; ctx.fillRect(x + 20, 270, 140, 100);
-      emoji(ctx, shops[i][1], x + 90, 320, 50);
-    }
-    ground(ctx, '#ced4da', '#adb5bd');
-    const hx = 460;
-    person(ctx, heroOpts(st, { x: hx, y: 500, t, pose: 'walk' }));
-    ['#ff6b6b', '#4d96ff'].forEach((c, i) => { ctx.fillStyle = c; const sw = Math.sin(t * 8.8 + i) * 4; rrect(ctx, hx - 44 + i * 70 + sw, 430, 34, 40, 4); ctx.fill(); });
-    drawCrew(ctx, st, t, [360], 500, 'walk', { facing: 1 });
-    rising(ctx, t, 6, 50, (x, y, i, p) => emoji(ctx, ['🏷️', '💳', '🛍️', '✨'][i % 4], x, y, 30, 0, Math.sin(p * Math.PI)), 300, 700);
-  };
-
-  // ---------- frame composition ----------
-  function moodOverlay(ctx, st) {
-    const tint = { sad: 'rgba(40,60,110,0.18)', angry: 'rgba(200,30,30,0.12)', anxious: 'rgba(90,60,140,0.1)', tired: 'rgba(30,30,40,0.12)' }[st.mood];
-    if (tint && st.scene !== 'rain') { ctx.fillStyle = tint; ctx.fillRect(0, 0, W, H); }
-    if (st.mood === 'angry') {
-      // little storm cloud over the scene
-      cloud(ctx, 60, 70, 0.8, 'rgba(70,70,80,0.9)');
-    }
-  }
-
-  function captionBar(ctx, st, t, meta) {
-    const caption = st.caption || '';
-    const typed = Math.floor(clamp((t - 0.5) / 3.2, 0, 1) * caption.length);
-    const shown = caption.slice(0, typed);
+  function nightHatch(ctx, top, bottom) {
     ctx.save();
-    ctx.font = '700 22px "Nunito",system-ui,sans-serif';
-    // wrap into max 2 lines
-    const maxW = W - 120;
-    const words = shown.split(' ');
-    const lines = [''];
-    for (const w of words) {
-      const test = (lines[lines.length - 1] + ' ' + w).trim();
-      if (ctx.measureText(test).width > maxW && lines.length < 2) lines.push(w);
-      else lines[lines.length - 1] = test;
+    ctx.strokeStyle = 'rgba(40,40,60,0.55)'; ctx.lineWidth = 1;
+    for (let x = -bottom; x < W; x += 14) { ctx.beginPath(); ctx.moveTo(x, bottom); ctx.lineTo(x + (bottom - top), top); ctx.stroke(); }
+    ctx.restore();
+  }
+  function sunOrMoon(ctx, b, t, x, y) {
+    if (b.weather === 'rain' || b.weather === 'snow' || b.weather === 'fog') return;   // no sun in the rain
+    if (b.time !== 'night') return sunMoon(ctx, b, t, x, y);
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, 30, 0, TAU); ctx.fill();
+    ctx.beginPath(); ctx.arc(x - 9, y - 6, 6, 0, TAU); ctx.fill(); ctx.beginPath(); ctx.arc(x + 10, y + 8, 4, 0, TAU); ctx.fill();
+    for (let i = 0; i < 18; i++) { ctx.fillStyle = '#ffffff'; const sx = rnd(i) * W, sy = rnd(i + 40) * 200 + 20; ctx.beginPath(); ctx.arc(sx, sy, 3, 0, TAU); ctx.fill(); }
+  }
+  function outdoors(ctx, b, t, horizon = 330) {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    if (b.time === 'night') nightHatch(ctx, 0, horizon);
+    sunOrMoon(ctx, b, t, 820, 90);
+    if (b.weather !== 'sun') clouds(ctx, t, 14, undefined, b.weather === 'rain' ? 5 : 3);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, horizon, W, H - horizon);
+  }
+  function tree(ctx, x, y, s = 1) {
+    ctx.fillStyle = '#8d6346'; ctx.fillRect(x - 6 * s, y - 60 * s, 12 * s, 60 * s);
+    ctx.fillStyle = '#7fbf7f'; ctx.beginPath(); ctx.arc(x, y - 82 * s, 36 * s, 0, TAU); ctx.fill();
+  }
+  function wall(ctx, b, t, winX = 640) {
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.beginPath(); ctx.rect(winX, 60, 200, 150); ctx.clip();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(winX, 60, 200, 150);
+    if (b.time === 'night') nightHatch(ctx, 60, 210);
+    sunOrMoon(ctx, b, t, winX + 140, 115);
+    if (b.weather === 'rain') { ctx.strokeStyle = 'rgba(40,40,60,0.6)'; ctx.lineWidth = 1.5; falling(ctx, t, 30, 400, (x, y) => { if (x > winX && x < winX + 200 && y > 60 && y < 210) { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 3, y + 12); ctx.stroke(); } }); }
+    if (b.weather === 'snow') falling(ctx, t, 40, 60, (x, y) => { if (x > winX && x < winX + 200 && y > 60 && y < 210) { ctx.fillStyle = '#333'; ctx.fillRect(x, y, 3, 3); } });
+    ctx.restore();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.strokeRect(winX, 60, 200, 150);
+    ctx.beginPath(); ctx.moveTo(winX + 100, 60); ctx.lineTo(winX + 100, 210); ctx.moveTo(winX, 135); ctx.lineTo(winX + 200, 135); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, FY + 8); ctx.lineTo(W, FY + 8); ctx.stroke();
+  }
+  function table(ctx, x, y, w) {
+    ctx.fillStyle = '#ffffff'; rrect(ctx, x, y, w, 16, 4); ctx.fill();
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 14, y + 16, 10, FY + 8 - y - 16); ctx.fillRect(x + w - 24, y + 16, 10, FY + 8 - y - 16);
+  }
+
+  // Each place draws its backdrop and may offer a surface ("table") for objects.
+  const PLACES = {
+    outside(ctx, b, t) { outdoors(ctx, b, t); hills(ctx, 0, '#ffffff', 335, 18, 0, 3); tree(ctx, 90, 340, 0.9); tree(ctx, 900, 345, 1.1); },
+    park(ctx, b, t) {
+      outdoors(ctx, b, t); hills(ctx, 0, '#ffffff', 330, 14, 0, 2);
+      tree(ctx, 70, 345); tree(ctx, 170, 335, 0.7); tree(ctx, 880, 340, 1.2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(690, 370, 140, 10); ctx.fillRect(690, 345, 140, 8);
+      ctx.fillRect(700, 380, 8, 40); ctx.fillRect(812, 380, 8, 40);
+      return { seat: { x: 730, y: 378 } };
+    },
+    garden(ctx, b, t) {
+      outdoors(ctx, b, t);
+      for (let x = 10; x < W; x += 34) { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x, 360); ctx.lineTo(x + 12, 345); ctx.lineTo(x + 24, 360); ctx.lineTo(x + 24, 410); ctx.lineTo(x, 410); ctx.closePath(); ctx.fill(); }
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 372, W, 6);
+      for (let i = 0; i < 9; i++) emoji(ctx, i % 2 ? '🌷' : '🌻', 40 + i * 110, 405, 34);
+    },
+    beach(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      if (b.time === 'night') nightHatch(ctx, 0, 260);
+      sunOrMoon(ctx, b, t, 760, 120); clouds(ctx, t, 12, undefined, 3);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(0, 260); ctx.lineTo(W, 260); ctx.stroke();
+      for (let r = 0; r < 4; r++) { ctx.beginPath(); for (let x = 0; x <= W; x += 10) ctx.lineTo(x, 280 + r * 22 + Math.sin(x / 40 + t * 3 + r) * 4); ctx.stroke(); }
+      ctx.beginPath(); for (let x = 0; x <= W; x += 10) ctx.lineTo(x, 370 + Math.sin(x / 70 + t * 2) * 6); ctx.stroke();
+      for (let i = 0; i < 40; i++) { ctx.fillStyle = '#333'; ctx.fillRect(rnd(i) * W, 390 + rnd(i + 9) * 120, 2, 2); }
+      emoji(ctx, '🌴', 70, 310, 130);
+      emoji(ctx, '⛵', wrap(100 + t * 25, W + 100) - 50, 250, 40);
+    },
+    pool(ctx, b, t) {
+      outdoors(ctx, b, t, 300);
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 120, 330, 720, 110, 10); ctx.fill();
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5;
+      for (let r = 0; r < 4; r++) { ctx.beginPath(); for (let x = 130; x <= 830; x += 10) ctx.lineTo(x, 350 + r * 24 + Math.sin(x / 30 + t * 3 + r) * 3); ctx.stroke(); }
+      ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(800, 290); ctx.lineTo(800, 345); ctx.moveTo(820, 290); ctx.lineTo(820, 345); ctx.stroke();
+      return { water: true };
+    },
+    city(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      if (b.time === 'night') nightHatch(ctx, 0, 300);
+      sunOrMoon(ctx, b, t, 850, 80);
+      for (let i = 0; i < 11; i++) {
+        const x = i * 90, h = 120 + rnd(i) * 140;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(x + 4, 360 - h, 80, h);
+        for (let wy = 360 - h + 14; wy < 340; wy += 26) for (let wx = x + 14; wx < x + 74; wx += 22) { ctx.fillStyle = b.time === 'night' && rnd(wx + wy) > 0.5 ? '#333' : '#ffffff'; ctx.fillRect(wx, wy, 12, 14); }
+      }
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 360, W, H - 360);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 440); ctx.lineTo(W, 440); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(905, 240, 8, 180); ctx.beginPath(); ctx.arc(909, 236, 14, 0, TAU); ctx.fill();
+    },
+    nature(ctx, b, t) {
+      outdoors(ctx, b, t);
+      const mtn = (x, h, w) => { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(x - w, 340); ctx.lineTo(x, 340 - h); ctx.lineTo(x + w, 340); ctx.closePath(); ctx.fill(); };
+      mtn(220, 230, 260); mtn(700, 260, 300); mtn(470, 170, 200);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(700, 80); ctx.lineTo(670, 130); ctx.lineTo(690, 125); ctx.lineTo(705, 140); ctx.lineTo(730, 128); ctx.stroke();
+      for (let i = 0; i < 7; i++) { const x = 30 + i * 150 + rnd(i) * 40; ctx.fillStyle = '#7fbf7f'; ctx.beginPath(); ctx.moveTo(x, 300); ctx.lineTo(x - 26, 370); ctx.lineTo(x + 26, 370); ctx.closePath(); ctx.fill(); }
+    },
+    road(ctx, b, t) {
+      outdoors(ctx, b, t, 320); hills(ctx, t, '#ffffff', 320, 22, 40, 2);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 380, W, 70);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 4; ctx.setLineDash([36, 30]); ctx.lineDashOffset = t * 320;
+      ctx.beginPath(); ctx.moveTo(0, 415); ctx.lineTo(W, 415); ctx.stroke(); ctx.setLineDash([]);
+      for (let i = 0; i < 4; i++) { const x = wrap(i * 300 - t * 200, W + 200) - 100; ctx.fillStyle = '#ffffff'; ctx.fillRect(x, 300, 6, 80); ctx.fillRect(x - 30, 290, 66, 26); }
+      return { road: true };
+    },
+    sky(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      if (b.time === 'night') nightHatch(ctx, 0, 380);
+      sunOrMoon(ctx, b, t, 820, 90);
+      clouds(ctx, t, -90, undefined, 6);
+      hills(ctx, t, '#ffffff', 470, 16, 30, 4);
+      return { flying: true };
+    },
+    airport(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      ctx.save(); ctx.beginPath(); ctx.rect(60, 50, 840, 220); ctx.clip();
+      if (b.time === 'night') nightHatch(ctx, 50, 270);
+      clouds(ctx, t, 10, undefined, 3);
+      const p = wrap(t / 9, 1);
+      emoji(ctx, '✈️', lerp(40, 940, p), 210 - p * 120, 80, Math.PI / 4 - 0.25);
+      ctx.restore();
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.strokeRect(60, 50, 840, 220);
+      for (let x = 270; x < 900; x += 210) { ctx.beginPath(); ctx.moveTo(x, 50); ctx.lineTo(x, 270); ctx.stroke(); }
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 700, 290, 200, 54, 6); ctx.fill();
+      ctx.font = '700 18px "Nunito",system-ui,sans-serif'; ctx.fillStyle = '#333'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+      ctx.fillText('GATE 12   ✈ ON TIME', 714, 317);
+      ctx.beginPath(); ctx.moveTo(0, FY + 8); ctx.lineTo(W, FY + 8); ctx.stroke();
+      emoji(ctx, '🧳', 640, FY - 20, 50);
+    },
+    home(ctx, b, t) {
+      wall(ctx, b, t, 660);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.strokeRect(80, 90, 110, 80);
+      ctx.beginPath(); ctx.moveTo(95, 155); ctx.lineTo(125, 120); ctx.lineTo(145, 140); ctx.lineTo(160, 125); ctx.lineTo(178, 155); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 540, 330, 260, 70, 18); ctx.fill(); rrect(ctx, 520, 360, 300, 50, 18); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(880, 260, 6, 150); ctx.beginPath(); ctx.moveTo(860, 260); ctx.lineTo(906, 260); ctx.lineTo(893, 220); ctx.lineTo(873, 220); ctx.closePath(); ctx.fill();
+      return { seat: { x: 600, y: 395 } };
+    },
+    bedroom(ctx, b, t) {
+      wall(ctx, b, t, 660);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(60, 300, 18, 120); ctx.fillRect(420, 340, 14, 80);
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 70, 340, 360, 46, 8); ctx.fill();
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 88, 316, 90, 30, 12); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(500, 350, 80, 70);
+      emoji(ctx, '⏰', 540, 330, 34);
+      return { bed: { x: 250, y: 340 } };
+    },
+    kitchen(ctx, b, t) {
+      wall(ctx, b, t, 380);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(60, 300, 840, 20); ctx.fillRect(60, 320, 840, 100);
+      for (let x = 60; x < 900; x += 140) { ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.strokeRect(x + 10, 330, 120, 80); }
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(640, 286, 140, 14);
+      for (let i = 0; i < 2; i++) { ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(675 + i * 70, 293, 24, 5, 0, 0, TAU); ctx.stroke(); }
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(60, 80, 120, 220);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(60, 170); ctx.lineTo(180, 170); ctx.stroke();
+      return { table: { x: 230, y: 300, w: 380 }, stove: { x: 710, y: 285 } };
+    },
+    office(ctx, b, t) {
+      wall(ctx, b, t, 680);
+      clockFace(ctx, 140, 110, t);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.strokeRect(300, 70, 220, 130);
+      ctx.beginPath(); for (let i = 0; i <= 6; i++) ctx.lineTo(320 + i * 30, 180 - i * 14 - Math.sin(i) * 8); ctx.stroke();
+      table(ctx, 420, 320, 400);
+      emoji(ctx, '🪴', 880, 380, 60);
+      return { table: { x: 440, y: 320, w: 360 }, desk: true };
+    },
+    school(ctx, b, t) {
+      wall(ctx, b, t, 720);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(170, 60, 460, 200);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(200, 110); ctx.lineTo(260, 110); ctx.moveTo(200, 150); ctx.lineTo(330, 150); ctx.moveTo(200, 190); ctx.lineTo(300, 190); ctx.stroke();
+      ctx.font = '700 30px "Nunito",system-ui,sans-serif'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.fillText('A + B = C', 470, 130);
+      table(ctx, 520, 330, 200);
+      return { table: { x: 530, y: 330, w: 180 } };
+    },
+    restaurant(ctx, b, t) {
+      wall(ctx, b, t, 60);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(560, 0); ctx.lineTo(560, 110); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.moveTo(525, 150); ctx.lineTo(595, 150); ctx.lineTo(578, 110); ctx.lineTo(542, 110); ctx.closePath(); ctx.fill();
+      table(ctx, 380, 320, 360);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(380, 336, 360, 24);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; for (let x = 392; x < 740; x += 24) { ctx.beginPath(); ctx.moveTo(x, 336); ctx.lineTo(x, 360); ctx.stroke(); }
+      return { table: { x: 400, y: 320, w: 320 } };
+    },
+    store(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      for (let s = 0; s < 3; s++) {
+        const y = 110 + s * 90;
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(40, y, 880, 10);
+        for (let i = 0; i < 18; i++) { const h = 30 + rnd(i + s * 18) * 30; ctx.fillStyle = rnd(i * 3 + s) > 0.6 ? '#888' : '#ffffff'; ctx.fillRect(50 + i * 48, y - h, 38, h); }
+      }
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, FY + 8); ctx.lineTo(W, FY + 8); ctx.stroke();
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 380, 20, 200, 44, 8); ctx.fill();
+      ctx.font = '700 28px "Nunito",system-ui,sans-serif'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('SHOP', 480, 43);
+    },
+    gym(ctx, b, t) {
+      wall(ctx, b, t, 700);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(60, 300, 260, 12); ctx.fillRect(70, 312, 10, 108); ctx.fillRect(300, 312, 10, 108);
+      for (let i = 0; i < 4; i++) emoji(ctx, '🏋️', 100 + i * 60, 285, 36);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.strokeRect(380, 70, 220, 260);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(500, 405, 260, 12);
+    },
+    hospital(ctx, b, t) {
+      wall(ctx, b, t, 680);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(110, 80, 70, 70);
+      ctx.fillStyle = '#333'; ctx.fillRect(135, 90, 20, 50); ctx.fillRect(120, 105, 50, 20);
+      ctx.fillStyle = '#ffffff'; rrect(ctx, 250, 340, 320, 40, 8); ctx.fill(); ctx.fillRect(260, 380, 10, 40); ctx.fillRect(550, 380, 10, 40);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(610, 200, 6, 220); rrect(ctx, 596, 200, 34, 44, 8); ctx.fill();
+      return { bed: { x: 410, y: 340 } };
+    },
+    stage(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      nightHatch(ctx, 0, 300);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2;
+      for (let i = 0; i < 3; i++) { const a = Math.sin(t * 1.4 + i * 2) * 0.35; ctx.save(); ctx.translate(200 + i * 280, 0); ctx.rotate(a); ctx.beginPath(); ctx.moveTo(-8, 0); ctx.lineTo(-90, 300); ctx.moveTo(8, 0); ctx.lineTo(90, 300); ctx.stroke(); ctx.restore(); }
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(100, 300, 760, 30);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(130, 200, 60, 100); ctx.fillRect(770, 200, 60, 100);
+      [160, 800].forEach((x) => { ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, 260, 18 + Math.abs(Math.sin(t * 8)) * 3, 0, TAU); ctx.fill(); });
+      return { stageY: 300 };
+    },
+    cinema(ctx, b, t) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+      nightHatch(ctx, 0, H);
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(160, 40, 640, 230);
+      for (let r = 0; r < 2; r++) for (let i = 0; i < 9; i++) { ctx.fillStyle = '#ffffff'; rrect(ctx, 30 + i * 105 + r * 50, 330 + r * 60, 80, 70, 14); ctx.fill(); }
+      return { screen: { x: 480, y: 155 } };
+    },
+    party(ctx, b, t) {
+      wall(ctx, b, t, 700);
+      ctx.strokeStyle = '#333'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(0, 30); ctx.quadraticCurveTo(340, 90, 680, 30); ctx.stroke();
+      for (let i = 0; i < 12; i++) { const x = 20 + i * 55, y = 30 + Math.sin((x / 680) * Math.PI) * 30; ctx.fillStyle = i % 2 ? '#888' : '#ffffff'; ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + 34, y); ctx.lineTo(x + 17, y + 32); ctx.closePath(); ctx.fill(); }
+      for (let i = 0; i < 4; i++) { const bx = 80 + i * 44 + Math.sin(t * 1.5 + i) * 6, by = 170 + (i % 2) * 26 + Math.sin(t * 2 + i) * 6; ctx.strokeStyle = '#333'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(bx, by + 28); ctx.lineTo(150, 320); ctx.stroke(); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.ellipse(bx, by, 22, 28, 0, 0, TAU); ctx.fill(); }
+      table(ctx, 560, 330, 300);
+      return { table: { x: 580, y: 330, w: 260 } };
     }
-    const full = caption.length > 0;
-    if (full) {
-      const bh = 26 + 28 * Math.max(1, ctx.measureText(caption).width > maxW ? 2 : 1);
-      ctx.fillStyle = 'rgba(20,20,35,0.62)';
-      rrect(ctx, 40, H - bh - 16, W - 80, bh, 16); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-      lines.forEach((l, i) => ctx.fillText(l, 60, H - bh - 16 + 14 + i * 28));
+  };
+
+  function clockFace(ctx, x, y, t) {
+    ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(x, y, 36, 0, TAU); ctx.fill();
+    ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(t * 0.5) * 18, y - Math.cos(t * 0.5) * 18); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + Math.sin(t * 5) * 28, y - Math.cos(t * 5) * 28); ctx.stroke();
+  }
+
+  function weatherFx(ctx, b, t) {
+    if (!b.weather || ['home', 'bedroom', 'kitchen', 'office', 'school', 'restaurant', 'store', 'gym', 'hospital', 'cinema', 'party'].includes(b.setting)) return;
+    if (b.weather === 'rain') { ctx.strokeStyle = 'rgba(40,40,60,0.7)'; ctx.lineWidth = 1.5; falling(ctx, t, 110, 480, (x, y) => { ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x - 4, y + 14); ctx.stroke(); }); }
+    if (b.weather === 'snow') falling(ctx, t, 90, 60, (x, y, i) => { ctx.fillStyle = '#333'; ctx.beginPath(); ctx.arc(x, y, 1.5 + rnd(i) * 2, 0, TAU); ctx.fill(); }, { drift: 30 });
+    if (b.weather === 'wind') { ctx.strokeStyle = '#333'; ctx.lineWidth = 2; for (let i = 0; i < 5; i++) { const x = wrap(i * 220 + t * 300, W + 200) - 100, y = 90 + i * 45; ctx.beginPath(); ctx.moveTo(x, y); ctx.quadraticCurveTo(x + 40, y - 12, x + 80, y); ctx.stroke(); } }
+    if (b.weather === 'fog') { ctx.strokeStyle = 'rgba(40,40,60,0.4)'; ctx.lineWidth = 2; for (let y = 120; y < 400; y += 30) { ctx.beginPath(); for (let x = 0; x <= W; x += 20) ctx.lineTo(x, y + Math.sin(x / 50 + t) * 4); ctx.stroke(); } }
+  }
+
+  // ---- bubbles & labels ----
+  function speechBubble(ctx, x, y, w, h, tailX, tailY, jagged = false) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    if (jagged) {
+      const n = 14;
+      for (let i = 0; i <= n; i++) { const a = (i / n) * TAU, r = i % 2 ? 1 : 0.82; ctx.lineTo(x + w / 2 + Math.cos(a) * w / 2 * r, y + h / 2 + Math.sin(a) * h / 2 * r); }
+    } else rrect(ctx, x, y, w, h, 18);
+    ctx.fill();
+    ctx.beginPath(); ctx.moveTo(x + w * 0.35, y + h - 2); ctx.lineTo(tailX, tailY); ctx.lineTo(x + w * 0.55, y + h - 2); ctx.closePath(); ctx.fill();
+  }
+  function thoughtBubble(ctx, x, y, w, h, fromX, fromY) {
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    const n = 10;
+    ctx.moveTo(x + w / 2 + w / 2, y + h / 2);
+    for (let i = 1; i <= n; i++) {
+      const a0 = ((i - 1) / n) * TAU, a1 = (i / n) * TAU, am = (a0 + a1) / 2;
+      ctx.quadraticCurveTo(x + w / 2 + Math.cos(am) * w * 0.62, y + h / 2 + Math.sin(am) * h * 0.66, x + w / 2 + Math.cos(a1) * w / 2, y + h / 2 + Math.sin(a1) * h / 2);
     }
-    // top chips
+    ctx.closePath(); ctx.fill();
+    for (let i = 0; i < 3; i++) { const k = (i + 1) / 4; ctx.beginPath(); ctx.arc(lerp(fromX, x + w / 2, k * 0.8), lerp(fromY, y + h, k * 0.9), 5 + i * 3, 0, TAU); ctx.fill(); }
+  }
+  function crossOut(ctx, x, y, r) {
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 4; ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r); ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r); ctx.stroke();
+  }
+  function wordLabel(ctx, str, x, y) {
+    ctx.save();
+    ctx.font = '700 15px "Nunito",system-ui,sans-serif'; ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(str, x, y);
+    ctx.restore();
+  }
+  function thingIcon(ctx, th, x, y, size, s) {
+    if (s <= 0.01) return;
+    for (let k = th.count - 1; k >= 0; k--) emoji(ctx, th.emoji, x + k * size * 0.55, y - k * 4, size * s * (k ? 0.85 : 1));
+  }
+
+  // ---- the panel ----
+  const HELD = new Set(['hold', 'eat', 'read', 'give', 'throw', 'carry', 'play', 'cook', 'win', 'listen', 'clean', 'sing']);
+  const DEFAULT_PROP = { read: '📖', write: '✏️', work: '💻', listen: '🎧', clean: '🧹', carry: '🛍️', win: '🏆', sing: '🎤', cook: '🍳', watch: '📺' };
+
+  function currentAction(b, tl) {
+    if (b.negated) return null;
+    let cur = null;
+    for (const a of b.actions) if (tl >= a.at) cur = a;
+    return cur;
+  }
+
+  function drawPanel(ctx, b, tl, t) {
+    const place = PLACES[b.setting] || PLACES.outside;
+    // a written place is pencilled in faintly, then inked when its word is written
+    const placeAt = b.settingWord >= 0 ? b.wordTimes[b.settingWord] : -1;
+    const inked = placeAt < 0 ? 1 : clamp((tl - placeAt) / 0.4, 0, 1);
+    ctx.save();
+    if (inked < 1) ctx.globalAlpha = 0.28 + 0.72 * inked;
+    const spots = place(ctx, b, t) || {};
+    ctx.restore();
+    const act = currentAction(b, tl);
+    const kind = act ? act.kind : null;
+    const since = act ? tl - act.at : 0;
+    const thinking = kind === 'think' || b.negated;
+
+    // expand the cast into figures
+    const figs = [];
+    b.cast.forEach((c, ci) => {
+      for (let k = 0; k < Math.min(3, c.count); k++) figs.push({ c, ci, k, label: k === 0 ? c.label : null });
+    });
+    const thinker = figs.find((f) => f.c.isMe) || figs[0];
+    const inScene = thinking ? [thinker] : figs;
+    const inThought = thinking ? figs.filter((f) => f !== thinker) : [];
+    const n = inScene.length;
+    const spacing = n > 3 ? 92 : 110;
+    let cx = 360;
+    if (b.setting === 'restaurant' || b.setting === 'kitchen') cx = 300;
+    if (thinking) cx = 300;
+
+    // where held/placed things go
+    const held = HELD.has(kind) ? b.things.find((th) => th.kind === 'thing' && th.wordIndex > (act ? act.word - 1 : -1)) || b.things.find((th) => th.kind === 'thing') : null;
+    const heldEmoji = held ? held.emoji : (DEFAULT_PROP[kind] && !(kind === 'watch' && b.things.length) ? DEFAULT_PROP[kind] : null);
+
+    // vehicles replace walking figures
+    if (kind === 'drive' || (spots.road && kind !== 'walk' && kind !== 'run' && !kind && b.cast.length)) {
+      drawCar(ctx, cx + 60, FY - 10, inScene, b, t, tl);
+    } else if (kind === 'fly' || (spots.flying && (!kind || kind === 'sit' || kind === 'sleep' || kind === 'watch'))) {
+      const p = wrap((tl - (act ? act.at : 0)) / 6, 1);
+      emoji(ctx, '✈️', lerp(120, 840, p), 210 - Math.sin(p * Math.PI) * 50, 120, Math.PI / 4);
+      wordLabel(ctx, inScene.map((f) => f.label).filter(Boolean).join(' & ') + ' ✈', lerp(120, 840, p), 290 - Math.sin(p * Math.PI) * 50);
+    } else {
+      inScene.forEach((f, i) => {
+        const appear = popIn(tl, f.c.at || 0);
+        if (appear <= 0.01) return;
+        const isSubject = !b.animalActor && (i === 0 || (b.cast[0] && f.c === b.cast[0]) || (kind && /dance|jump|sing|laugh|walk|run|swim|climb|carry/.test(kind)));
+        let x = cx - (n - 1) * spacing / 2 + i * spacing, y = FY, pose = 'stand', facing = i === 0 ? 1 : -1, rot = 0;
+        let mood = f.c.isMe ? b.mood : (b.mood === 'sad' || b.mood === 'angry' ? 'calm' : 'joyful');
+        const k = since;
+        switch (isSubject ? kind : (kind === 'hug' || kind === 'kiss' || kind === 'talk' || kind === 'wave' || kind === 'argue' || kind === 'give' || kind === 'throw' || kind === 'play' || kind === 'eat' || kind === 'watch' || kind === 'sit' ? kind : null)) {
+          case 'walk': pose = 'walk'; facing = 1; x += Math.min(140, k * 45) - 40; break;
+          case 'run': pose = 'run'; facing = 1; x += Math.min(200, k * 90) - 60; break;
+          case 'climb': pose = 'walk'; facing = 1; x += Math.min(160, k * 40); y -= Math.min(90, k * 22); break;
+          case 'dance': pose = (Math.floor(t * 2 + i) % 2) ? 'jump' : 'cheer'; break;
+          case 'jump': case 'win': pose = 'jump'; break;
+          case 'laugh': pose = 'cheer'; break;
+          case 'sing': pose = 'cheer'; break;
+          case 'hug': case 'kiss': pose = 'hold'; if (n > 1 && i < 2) x = lerp(x, cx + (i ? 24 : -24), ease(k / 0.8)); break;
+          case 'talk': pose = Math.floor(t / 1.2 + i) % 2 ? 'wave' : 'stand'; break;
+          case 'argue': pose = 'wave'; mood = 'angry'; break;
+          case 'wave': pose = 'wave'; break;
+          case 'sit': case 'watch': pose = 'sit'; facing = 1; if (spots.seat) { x = spots.seat.x + i * 90 - 40; y = spots.seat.y; } break;
+          case 'work': case 'write': pose = 'type'; facing = 1; if (spots.table) { x = spots.table.x - 30; y = FY - 10; } break;
+          case 'read': pose = spots.seat ? 'sit' : 'hold'; if (spots.seat) { x = spots.seat.x + i * 90 - 40; y = spots.seat.y; facing = 1; } break;
+          case 'eat': case 'hold': case 'carry': case 'give': case 'throw': case 'play': case 'clean': case 'listen': case 'cook': pose = 'hold'; if (kind === 'carry') { pose = 'walk'; x += Math.min(120, k * 40) - 40; } break;
+          case 'fall': rot = Math.min(1.35, k * 3); mood = 'anxious'; break;
+          case 'cry': mood = 'sad'; break;
+          case 'sleep': rot = -Math.PI / 2; mood = 'calm'; if (spots.bed) { x = spots.bed.x + 40 + i * 30; y = spots.bed.y - 6; } break;
+          case 'wake': if (spots.bed) { x = spots.bed.x + i * 30; y = spots.bed.y + 20; } pose = k < 0.9 ? 'stand' : 'cheer'; rot = k < 0.9 ? -Math.PI / 2 * (1 - ease(k / 0.9)) : 0; break;
+          case 'swim': rot = -1.2; y = (spots.water ? 395 : FY - 20) + Math.sin(t * 4 + i) * 4; x += Math.min(160, k * 40); pose = 'run'; break;
+          case 'ride': pose = 'sit'; x += Math.min(180, k * 60); break;
+          default: pose = 'stand';
+        }
+        if (kind === 'cook' && spots.stove && isSubject) { x = spots.stove.x - 60; facing = 1; }
+        const satFirst = b.actions.some((a) => a.kind === 'sit' && act && a.at < act.at);
+        if (satFirst && ['eat', 'hold', 'read', 'talk', 'watch', 'write', 'listen'].includes(kind) && spots.seat) {
+          pose = kind === 'talk' ? 'sit' : (kind === 'watch' ? 'sit' : 'sit'); x = spots.seat.x + i * 80 - 30; y = spots.seat.y; facing = i === 0 ? 1 : -1;
+        }
+        if (kind === 'watch' && !spots.screen) facing = -1;
+        const s = 0.95 * (appear < 1 ? appear : 1);
+        ctx.save();
+        if (rot) { ctx.translate(x, y - 45); ctx.rotate(rot); ctx.translate(-x, -(y - 45)); }
+        if (kind === 'ride' && isSubject) emoji(ctx, (b.things.find((th) => ['🚲', '🐎', '🛴', '🏍️', '🛹'].includes(th.emoji)) || { emoji: '🚲' }).emoji, x, y - 10, 90);
+        person(ctx, { x, y, s, color: f.c.isMe ? '#ffffff' : '#bbbbbb', skin: '#ffffff', hair: f.c.isMe ? '#222' : ['#222', '#ffffff', '#666'][f.ci % 3], mood, pose, t, phase: i * 1.7, facing, label: rot && Math.abs(rot) > 1 ? null : f.label });
+        ctx.restore();
+        f.pos = { x, y, facing, pose };
+        // effects tied to this figure
+        if (isSubject && kind === 'sleep' && i === 0) rising(ctx, t, 4, 30, (zx, zy, zi, p) => text(ctx, 'Z', zx, zy, 22 + zi * 6, `rgba(30,30,40,${Math.sin(p * Math.PI)})`), x - 20, x + 60);
+        if (isSubject && kind === 'sing' && i === 0) rising(ctx, t, 6, 50, (nx, ny, ni, p) => text(ctx, ['♪', '♫'][ni % 2], nx, ny, 30, `rgba(30,30,40,${Math.sin(p * Math.PI)})`, { weight: 700 }), x, x + 160);
+        if (kind === 'dance' && i === 0) rising(ctx, t, 6, 50, (nx, ny, ni, p) => text(ctx, ['♪', '♫'][ni % 2], nx, ny, 26, `rgba(30,30,40,${Math.sin(p * Math.PI)})`, { weight: 700 }), cx - 200, cx + 200);
+        if (isSubject && kind === 'laugh' && i === 0) text(ctx, 'ha ha!', x + 60, FY - 170 + Math.sin(t * 8) * 4, 28, '#222');
+        if (isSubject && kind === 'fall' && i === 0) for (let si = 0; si < 3; si++) text(ctx, '✶', x + 40 + Math.cos(t * 4 + si * 2) * 30, y - 60 + Math.sin(t * 4 + si * 2) * 12, 20, '#222');
+        if (isSubject && kind === 'cry' && i === 0) for (let ti = 0; ti < 2; ti++) { const p = wrap(t * 1.5 + ti / 2, 1); ctx.fillStyle = '#888'; ctx.beginPath(); ctx.arc(x + 6 + ti * 16, y - 115 + p * 40, 3.5, 0, TAU); ctx.fill(); }
+      });
+      // hearts for hugs and kisses
+      if ((kind === 'hug' || kind === 'kiss') && n > 1) {
+        const p = ease(since / 0.8);
+        heart(ctx, cx, FY - 170 - p * 10, 2.2 * p, '#ff4d6d');
+        if (kind === 'kiss') rising(ctx, t, 6, 40, (hx, hy, hi, q) => heart(ctx, hx, hy, 1, '#ff4d6d', Math.sin(q * Math.PI)), cx - 100, cx + 100);
+      }
+      // speech
+      if ((kind === 'talk' || kind === 'argue') && inScene.length) {
+        const who = inScene[Math.floor(t / 1.2) % inScene.length].pos || { x: cx, y: FY };
+        const bx = Math.min(W - 220, Math.max(20, who.x + 10)), by = FY - 250;
+        speechBubble(ctx, bx, by, 200, 74, who.x + 6, FY - 140, kind === 'argue');
+        const said = b.things.filter((th) => th.at <= tl);
+        if (kind === 'argue') text(ctx, '#@!%', bx + 100, by + 38, 30, '#222');
+        else if (said.length) said.slice(0, 3).forEach((th, si) => emoji(ctx, th.emoji, bx + 100 + (si - (Math.min(3, said.length) - 1) / 2) * 56, by + 36, 40));
+        else text(ctx, ['blah blah', 'yeah!', 'no way!', 'haha'][Math.floor(t / 1.2) % 4], bx + 100, by + 38, 26, '#222');
+      }
+    }
+
+    // things: in the hand, in a thought bubble, on a surface, in the sky, or on the ground
+    const subject = inScene[0] && inScene[0].pos;
+    const placed = [];
+    const rightmost = Math.max(cx + (n - 1) * spacing / 2, ...inScene.map((f) => (f.pos ? f.pos.x : 0)));
+    let groundX = Math.max(rightmost + 100, 520), skyX = 560;
+    if (kind === 'watch' && !spots.screen) groundX = Math.max(groundX, 560);
+    b.things.forEach((th) => {
+      const s = popIn(tl, th.at);
+      if (s <= 0.01) return;
+      if (thinking) { placed.push(th); return; }
+      if (held && th === held && subject) return;
+      if (kind === 'watch' && (th.emoji === '🎬' || th.emoji === '📺')) return;
+      if (kind === 'talk' && subject) return;
+      let x, y, size = 64;
+      if (th.kind === 'sky') { x = skyX; y = 110 + Math.sin(t * 2 + skyX) * 8; skyX += 110; if (th.emoji === '🐦' || th.emoji === '🦋' || th.emoji === '🐝') x = wrap(skyX + t * 60, W); }
+      else if (th.kind === 'animal') {
+        x = groundX; y = FY - 26 - Math.abs(Math.sin(t * 7 + groundX)) * 12; groundX += 90 + (th.count - 1) * 36;
+        const acting = b.animalActor === th.emoji;
+        if (acting && act) {                             // the animal does the verb
+          if (kind === 'run' || kind === 'walk' || kind === 'swim') { x = wrap(x - 200 + since * (kind === 'run' ? 220 : 90), W - 80) + 40; y = FY - 26 - Math.abs(Math.sin(t * 12)) * 22; }
+          if (kind === 'jump' || kind === 'dance' || kind === 'play') y = FY - 26 - Math.abs(Math.sin(t * 5)) * 60;
+          if (kind === 'sleep') { y = FY - 20; rising(ctx, t, 3, 25, (zx, zy, zi, p) => text(ctx, 'z', zx, zy, 18 + zi * 6, `rgba(30,30,40,${Math.sin(p * Math.PI)})`), x - 10, x + 40); }
+        } else if (!b.animalActor && (kind === 'run' || kind === 'walk')) x += Math.min(200, since * 80) - 60;
+      } else if (spots.table) {
+        x = spots.table.x + 40 + placed.filter((p) => p.onTable).length * 90; y = spots.table.y - 28; size = 56; th.onTable = true;
+        if (x > spots.table.x + spots.table.w) { x = groundX; y = FY - 30; groundX += 90; }
+      } else { x = groundX; y = FY - 30; groundX += 90 + (th.count - 1) * 36; }
+      if (x > W - 40) { x = 520 + (placed.length % 4) * 100; y = 150 + Math.floor(placed.length / 4) * 90; }
+      thingIcon(ctx, th, x, y, size, s);
+      wordLabel(ctx, th.word, x + (th.count - 1) * size * 0.27, y + size / 2 + 12);
+      placed.push(th);
+    });
+
+    // the held prop follows the subject's hand
+    if (heldEmoji && subject && !thinking) {
+      const s = held ? popIn(tl, held.at) : 1;
+      let hx = subject.x + 30 * subject.facing, hy = subject.y - 80;
+      if (kind === 'eat') { const p = (Math.sin(t * 4) + 1) / 2; hx = lerp(hx, subject.x + 14 * subject.facing, p); hy = lerp(hy, subject.y - 105, p); }
+      if (kind === 'win') { hx = subject.x; hy = subject.y - 175 - Math.abs(Math.sin(t * 2)) * 30; }
+      if (kind === 'give' && inScene[1] && inScene[1].pos) { const p = ease((since - 0.6) / 0.8); hx = lerp(hx, inScene[1].pos.x - 30, p); }
+      if ((kind === 'throw' || kind === 'play')) {
+        const target = inScene[1] && inScene[1].pos ? inScene[1].pos.x - 20 : subject.x + 300;
+        const p = wrap(since / 1.4, 1), q = Math.floor(since / 1.4) % 2 ? 1 - p : p;
+        hx = lerp(subject.x + 30, target, q); hy = subject.y - 90 - Math.sin(q * Math.PI) * 140;
+      }
+      if (kind === 'cook' && spots.stove) { hx = spots.stove.x; hy = spots.stove.y - 22; for (let si = 0; si < 3; si++) { const p = wrap(t * 0.7 + si / 3, 1); ctx.strokeStyle = `rgba(40,40,40,${0.8 * (1 - p)})`; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(hx - 15 + si * 15, hy - 30 - p * 50); ctx.quadraticCurveTo(hx - 5 + si * 15 + Math.sin(t * 3) * 8, hy - 50 - p * 50, hx - 15 + si * 15, hy - 70 - p * 50); ctx.stroke(); } }
+      if (kind === 'clean') hx += Math.sin(t * 6) * 18;
+      if (kind === 'listen') { hx = subject.x; hy = subject.y - 125; }
+      const sz = kind === 'cook' ? 50 : 46;
+      if (held) thingIcon(ctx, held, hx, hy, sz, s); else emoji(ctx, heldEmoji, hx, hy, sz);
+      if (held && s > 0.5) wordLabel(ctx, held.word, hx, hy + 38);
+    }
+    if (kind === 'watch' && !thinking) {
+      const scr = spots.screen || { x: 250, y: 260 };
+      const shown = b.things.find((th) => th.emoji === '🎬' || th.emoji === '📺');
+      if (!spots.screen) { ctx.fillStyle = '#ffffff'; rrect(ctx, scr.x - 90, scr.y - 60, 180, 120, 8); ctx.fill(); ctx.fillStyle = '#ffffff'; ctx.fillRect(scr.x - 6, scr.y + 60, 12, FY - scr.y - 52); }
+      ctx.strokeStyle = 'rgba(40,40,40,0.6)'; ctx.lineWidth = 1.5;
+      for (let i = 0; i < 4; i++) { const yy = scr.y - 40 + ((t * 40 + i * 22) % 90); ctx.beginPath(); ctx.moveTo(scr.x - 70, yy); ctx.lineTo(scr.x + 70, yy); ctx.stroke(); }
+      emoji(ctx, ['🦖', '🚀', '👻', '🦸'][Math.floor(t / 1.5) % 4], scr.x, scr.y, 60);
+      if (shown) wordLabel(ctx, shown.word, scr.x, scr.y + (spots.screen ? 98 : 48));
+    }
+
+    // a thought bubble holds what someone thinks of, misses, wants, or didn't do
+    if (thinking && subject) {
+      const bx = subject.x + 70, by = 50, bw = 420, bh = 210;
+      const appear = popIn(tl, b.negated ? (b.wordTimes[Math.max(0, b.words.findIndex((w) => /n't|not|never/i.test(w)))] || 0) : (act ? act.at : 0));
+      if (appear > 0.01) {
+        ctx.save(); ctx.translate(bx + bw / 2, by + bh / 2); ctx.scale(appear, appear); ctx.translate(-(bx + bw / 2), -(by + bh / 2));
+        thoughtBubble(ctx, bx, by, bw, bh, subject.x + 20, subject.y - 150);
+        const items = [];
+        inThought.forEach((f) => items.push({ person: f }));
+        placed.forEach((th) => items.push({ th }));
+        if (b.notPlace) items.push({ place: b.notPlace });
+        if (b.negated && !items.length && b.actions[0]) items.push({ verb: b.actions[0].verb });
+        const cols = Math.max(1, Math.min(4, items.length));
+        items.slice(0, 4).forEach((it, ii) => {
+          const ix = bx + bw / 2 + (ii - (cols - 1) / 2) * 100, iy = by + bh / 2 + 10;
+          if (it.person) person(ctx, { x: ix, y: iy + 55, s: 0.6, color: '#bbbbbb', skin: '#ffffff', hair: '#222', mood: 'joyful', pose: 'wave', t, label: it.person.label });
+          else if (it.th) { thingIcon(ctx, it.th, ix, iy - 6, 56, popIn(tl, it.th.at)); wordLabel(ctx, it.th.word, ix, iy + 38); }
+          else if (it.place) { emoji(ctx, (JournalStoryboardIcons()[it.place]) || '❓', ix, iy - 6, 60); wordLabel(ctx, (b.words[b.notPlaceWord] || it.place).replace(/[^\w'-]/g, ''), ix, iy + 38); }
+          else if (it.verb) text(ctx, it.verb, ix, iy, 30, '#222');
+          if (b.negated) crossOut(ctx, ix, iy - 4, 34);
+        });
+        ctx.restore();
+      }
+    }
+    // "ran home": the destination waits at the right edge with an arrow
+    if (b.destination) {
+      const s3 = popIn(tl, b.wordTimes[b.destinationWord] || 0);
+      if (s3 > 0.01) {
+        const icon = JournalStoryboardIcons()[b.destination] || '🏠';
+        emoji(ctx, icon, 860, FY - 60, 120 * s3);
+        wordLabel(ctx, (b.words[b.destinationWord] || '').replace(/[^\w'-]/g, ''), 860, FY + 14);
+        ctx.strokeStyle = '#333'; ctx.lineWidth = 3; ctx.setLineDash([10, 10]);
+        ctx.beginPath(); ctx.moveTo(620, FY - 30); ctx.lineTo(770, FY - 30); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.moveTo(758, FY - 42); ctx.lineTo(774, FY - 30); ctx.lineTo(758, FY - 18); ctx.stroke();
+      }
+    }
+    // a named place ("to Rome") gets a signpost
+    if (b.placeName) {
+      const s2 = popIn(tl, b.wordTimes[b.placeNameWord] || 0);
+      if (s2 > 0.01) {
+        ctx.save(); ctx.translate(860, FY); ctx.scale(s2, s2);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(-4, -150, 8, 150);
+        ctx.font = '700 22px "Nunito",system-ui,sans-serif';
+        const tw = Math.max(90, ctx.measureText(b.placeName).width + 36);
+        ctx.beginPath(); ctx.moveTo(-tw / 2, -180); ctx.lineTo(tw / 2 - 14, -180); ctx.lineTo(tw / 2 + 6, -158); ctx.lineTo(tw / 2 - 14, -136); ctx.lineTo(-tw / 2, -136); ctx.closePath(); ctx.fill();
+        ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(b.placeName, -4, -157);
+        ctx.restore();
+      }
+    }
+    weatherFx(ctx, b, t);
+  }
+
+  function JournalStoryboardIcons() {
+    const g = typeof window !== 'undefined' ? window : globalThis;
+    return (g.JournalStoryboard && g.JournalStoryboard.PLACE_ICON) || {};
+  }
+
+  function drawCar(ctx, cx, cy, figs, b, t, tl) {
+    cy += Math.sin(t * 14) * 2;
+    ctx.fillStyle = '#ffffff'; rrect(ctx, cx - 130, cy - 44, 260, 54, 16); ctx.fill();
+    rrect(ctx, cx - 80, cy - 92, 160, 52, 18); ctx.fill();
+    ctx.fillStyle = '#ffffff'; rrect(ctx, cx - 68, cy - 84, 64, 40, 6); ctx.fill(); rrect(ctx, cx + 4, cy - 84, 64, 40, 6); ctx.fill();
+    figs.slice(0, 2).forEach((f, i) => {
+      if (popIn(tl, f.c.at || 0) <= 0.01) return;
+      const hx = cx + 36 - i * 72;
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(hx, cy - 60, 14, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(hx, cy - 64, 14.5, Math.PI * 1.05, Math.PI * 1.95); ctx.fill();
+      ctx.save(); ctx.translate(hx + 2, cy - 58); ctx.scale(0.6, 0.6); face(ctx, 0, 0, i ? 'joyful' : b.mood, t); ctx.restore();
+      if (f.label) wordLabel(ctx, f.label, hx, cy - 110);
+    });
+    [cx - 78, cx + 78].forEach((wx) => {
+      ctx.fillStyle = '#222'; ctx.beginPath(); ctx.arc(wx, cy + 12, 26, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(wx, cy + 12, 9, 0, TAU); ctx.fill();
+    });
+    for (let i = 0; i < 4; i++) { const p = wrap(t * 2 + i / 4, 1); ctx.fillStyle = '#ffffff'; ctx.beginPath(); ctx.arc(cx - 140 - p * 80, cy + 4 - p * 10, 8 + p * 12, 0, TAU); ctx.fill(); }
+  }
+
+  // ---- caption: the sentence, written word by word ----
+  function captionWords(ctx, b, tl, meta, index, total) {
+    ctx.save();
+    ctx.font = '700 24px "Nunito",system-ui,sans-serif';
+    const maxW = W - 140;
+    const shown = b.words.filter((_, i) => tl >= b.wordTimes[i]);
+    const lines = [[]];
+    let lineW = 0;
+    b.words.forEach((w, i) => {
+      const ww = ctx.measureText(w + ' ').width;
+      if (lineW + ww > maxW && lines[lines.length - 1].length) { lines.push([]); lineW = 0; }
+      lines[lines.length - 1].push({ w, i, x: lineW, ww }); lineW += ww;
+    });
+    const nLines = Math.min(3, lines.length), lh = 30;
+    const bh = 26 + nLines * lh, by = H - bh - 14;
+    ctx.fillStyle = 'rgba(20,20,35,0.62)';
+    rrect(ctx, 40, by, W - 80, bh, 14); ctx.fill();
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top'; ctx.fillStyle = '#fff';
+    lines.slice(0, 3).forEach((line, li) => line.forEach(({ w, i, x }) => {
+      if (tl < b.wordTimes[i]) return;
+      const age = tl - b.wordTimes[i];
+      ctx.fillStyle = '#fff';
+      ctx.fillText(w, 64 + x, by + 14 + li * lh);
+      if (age < 0.5) {                                    // underline the word being drawn right now
+        ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5;
+        const ww = ctx.measureText(w.replace(/[^\w'’-]+$/, '')).width;
+        ctx.beginPath(); ctx.moveTo(64 + x, by + 14 + li * lh + 27); ctx.lineTo(64 + x + ww * Math.min(1, age / 0.25), by + 14 + li * lh + 27); ctx.stroke();
+      }
+    }));
+    if (shown.length === 0) { ctx.globalAlpha = 0.4; ctx.fillText('…', 64, by + 14); }
+    ctx.restore();
+    // panel number and date
+    ctx.save();
+    ctx.font = '800 16px "Nunito",system-ui,sans-serif';
+    const tag = `${index + 1} / ${total}`;
+    const tw = ctx.measureText(tag).width + 24;
+    ctx.fillStyle = 'rgba(255,255,255,0.9)'; rrect(ctx, 20, 16, tw, 30, 15); ctx.fill();
+    ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(tag, 20 + tw / 2, 32);
     if (meta && meta.date) {
-      ctx.font = '800 16px "Nunito",system-ui,sans-serif';
       const dw = ctx.measureText(meta.date).width + 24;
-      ctx.fillStyle = 'rgba(255,255,255,0.85)'; rrect(ctx, W - dw - 20, 16, dw, 30, 15); ctx.fill();
-      ctx.fillStyle = '#333'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(meta.date, W - dw / 2 - 20, 32);
-      emoji(ctx, st.moodIcon, W - dw - 44, 31, 26);
+      ctx.fillStyle = 'rgba(255,255,255,0.9)'; rrect(ctx, W - dw - 20, 16, dw, 30, 15); ctx.fill();
+      ctx.fillStyle = '#333'; ctx.fillText(meta.date, W - dw / 2 - 20, 32);
     }
     ctx.restore();
   }
 
+  function panelFrame(ctx) {
+    ctx.strokeStyle = '#222'; ctx.lineWidth = 3;
+    ctx.strokeRect(8, 8, W - 16, H - 16);
+  }
 
   // ---------- doodle style ----------
   // Wraps the real 2D context: fills keep their exact geometry, but every shape gets a wobbly
@@ -1335,24 +1229,31 @@
     ctx.restore();
   }
 
-  function renderFrame(ctx, st, t, meta, style = 'doodle') {
+  function beatAt(sb, t) {
+    for (let i = 0; i < sb.beats.length; i++) if (t < sb.beats[i].start + sb.beats[i].duration) return i;
+    return sb.beats.length - 1;
+  }
+
+  function renderFrame(ctx, sb, t, meta, style = 'doodle') {
     const real = ctx;
+    const dur = sb.duration;
     if (style === 'doodle') {
       t = Math.floor(t * DRAW_FPS) / DRAW_FPS;                // animate "on twos" like hand-drawn cartoons
       ctx = doodleContext(real, Math.floor(t * BOIL_FPS));
     }
+    const i = beatAt(sb, t), b = sb.beats[i], tl = t - b.start;
     real.save();
     real.clearRect(0, 0, W, H);
-    (scenes[st.scene] || scenes.everyday)(ctx, t, st);
-    moodOverlay(ctx, st);
+    drawPanel(ctx, b, tl, t);
     if (style === 'doodle') paper(real);
     ctx.__ui = true;
-    captionBar(ctx, st, t, meta);
-    ctx = real;
-    // fade in / out for a clean loop
-    const fade = Math.min(clamp(t / 0.4, 0, 1), clamp((DUR - t) / 0.4, 0, 1));
-    if (fade < 1) { ctx.fillStyle = `rgba(10,10,20,${1 - fade})`; ctx.fillRect(0, 0, W, H); }
-    ctx.restore();
+    captionWords(ctx, b, tl, meta, i, sb.beats.length);
+    panelFrame(ctx);
+    ctx.__ui = false;
+    // each panel fades in from blank paper; the loop fades out to paper
+    const f = Math.min(clamp(tl / 0.3, 0, 1), clamp((dur - t) / 0.35, 0, 1));
+    if (f < 1) { real.fillStyle = `rgba(255,253,248,${1 - f})`; real.fillRect(0, 0, W, H); }
+    real.restore();
   }
 
   // ---------- player ----------
@@ -1369,6 +1270,7 @@
       this._tick = this._tick.bind(this);
     }
     setStory(story, meta) { this.story = story; this.meta = meta || {}; this.restart(); }
+    get duration() { return this.story ? this.story.duration : DUR; }
     restart() { this.start = performance.now(); if (!this.playing) this.play(); }
     play() { this.playing = true; cancelAnimationFrame(this.raf); this.raf = requestAnimationFrame(this._tick); }
     stop() { this.playing = false; cancelAnimationFrame(this.raf); }
@@ -1379,7 +1281,7 @@
     }
     _tick(now) {
       if (!this.playing) return;
-      const t = ((now - this.start) / 1000) % DUR;
+      const t = ((now - this.start) / 1000) % this.duration;
       this.drawAt(t);
       this.raf = requestAnimationFrame(this._tick);
     }
@@ -1397,12 +1299,12 @@
         rec.onerror = (e) => reject(e.error || e);
         this.restart();
         rec.start();
-        setTimeout(() => rec.state !== 'inactive' && rec.stop(), DUR * 1000);
+        setTimeout(() => rec.state !== 'inactive' && rec.stop(), this.duration * 1000);
       });
     }
   }
 
-  const api = { Animator, renderFrame, sceneIds: Object.keys(scenes), DURATION: DUR, WIDTH: W, HEIGHT: H };
+  const api = { Animator, renderFrame, places: Object.keys(PLACES), WIDTH: W, HEIGHT: H };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else global.JournalAnimator = api;
 })(typeof window !== 'undefined' ? window : globalThis);

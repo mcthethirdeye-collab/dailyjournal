@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Daily Reel Journal</title>
-  <meta name="description" content="A journal that turns the main event of each entry into a mini animation.">
+  <meta name="description" content="A journal that draws each entry as a black-and-white doodle, word by word.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Patrick+Hand&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/styles.css">
@@ -49,15 +49,12 @@
             <button id="downloadBtn" class="btn ghost small" title="Save this animation as a video">⬇ Video</button>
           </div>
         </div>
-        <p class="main-event"><span class="muted">Main event:</span> <span id="mainEvent">—</span></p>
+        <p class="main-event muted" id="mainEvent">—</p>
       </div>
 
       <form id="editor" class="editor card" autocomplete="off">
         <div class="editor-head">
           <input id="date" type="date" class="date" aria-label="Entry date" required>
-          <label class="scene-pick">Scene
-            <select id="sceneSelect" aria-label="Animation scene"></select>
-          </label>
         </div>
         <textarea id="text" rows="7" placeholder="How was your day? What was the big moment?&#10;&#10;e.g. “Sarah threw me a surprise birthday party with a chocolate cake! Best night ever.”" aria-label="Journal entry"></textarea>
         <div class="editor-foot">
@@ -74,6 +71,8 @@
   <div id="toast" class="toast" role="status" hidden></div>
 
   <script src="js/analyzer.js"></script>
+  <script src="js/lexicon.js"></script>
+  <script src="js/storyboard.js"></script>
   <script src="js/animator.js"></script>
   <script src="js/app.js"></script>
 </body>
