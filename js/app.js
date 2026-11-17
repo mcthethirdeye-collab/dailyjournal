@@ -49,6 +49,8 @@
   };
 
   const animator = new Animator($('stage'));
+  // The doodle style draws its text in a handwriting font; load it so the first frames use it.
+  if (document.fonts && document.fonts.load) document.fonts.load('22px "Patrick Hand"').catch(() => {});
 
   // ---------- helpers ----------
   const today = () => { const d = new Date(); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); };

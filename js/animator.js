@@ -109,13 +109,16 @@
   }
 
   function cloud(ctx, x, y, s, color = 'rgba(255,255,255,0.9)') {
+    // one closed, bumpy outline, so the doodle style inks only the silhouette
     ctx.save();
     ctx.fillStyle = color;
     ctx.beginPath();
-    ctx.arc(x, y, 26 * s, 0, TAU);
-    ctx.arc(x + 30 * s, y - 14 * s, 32 * s, 0, TAU);
-    ctx.arc(x + 64 * s, y, 26 * s, 0, TAU);
-    ctx.rect(x, y - 4 * s, 64 * s, 30 * s);
+    ctx.moveTo(x - 26 * s, y + 24 * s);
+    ctx.quadraticCurveTo(x - 46 * s, y - 2 * s, x - 8 * s, y - 10 * s);
+    ctx.quadraticCurveTo(x + 2 * s, y - 50 * s, x + 34 * s, y - 40 * s);
+    ctx.quadraticCurveTo(x + 64 * s, y - 52 * s, x + 72 * s, y - 14 * s);
+    ctx.quadraticCurveTo(x + 112 * s, y - 6 * s, x + 90 * s, y + 24 * s);
+    ctx.closePath();
     ctx.fill();
     ctx.restore();
   }
@@ -1056,12 +1059,184 @@
     ctx.restore();
   }
 
-  function renderFrame(ctx, st, t, meta) {
+
+  // ---------- doodle style ----------
+  // Wraps the real 2D context: fills keep their exact geometry, but every shape gets a wobbly
+  // ink outline and strokes are redrawn as hand-drawn polylines. The wobble changes a few times
+  // per second ("line boil"), the way hand-drawn cartoons shimmer between frames.
+  const HAND_FONT = '"Patrick Hand","Gochi Hand","Comic Sans MS",cursive';
+  const INK = '#2a2433';
+  const BOIL_FPS = 6, DRAW_FPS = 12, WOBBLE = 1.7, SEG = 18;
+
+  function doodleContext(real, seed) {
+    let subpaths = [], cur = null, last = [0, 0];
+    const startSub = (x, y) => { cur = { pts: [[x, y]], closed: false }; subpaths.push(cur); last = [x, y]; };
+    const addPt = (x, y) => {
+      if (!last) { startSub(x, y); return; }        // a lineTo right after beginPath acts as moveTo
+      if (!cur) startSub(last[0], last[1]);
+      const [x0, y0] = last;
+      const n = Math.max(1, Math.ceil(Math.hypot(x - x0, y - y0) / SEG));
+      for (let i = 1; i <= n; i++) cur.pts.push([x0 + (x - x0) * i / n, y0 + (y - y0) * i / n]);
+      last = [x, y];
+    };
+    const curve = (fn, n) => { for (let i = 1; i <= n; i++) { const p = fn(i / n); cur.pts.push(p); last = p; } };
+    const arcPts = (cx, cy, rx, ry, rot, a0, a1, ccw) => {
+      let d = a1 - a0;
+      if (!ccw && d < 0) d = d % TAU + TAU; if (ccw && d > 0) d = d % TAU - TAU;
+      if (Math.abs(a1 - a0) >= TAU) d = ccw ? -TAU : TAU;
+      const n = Math.max(6, Math.ceil(Math.abs(d) * Math.max(rx, ry) / 8));
+      const at = (a) => {
+        const ex = Math.cos(a) * rx, ey = Math.sin(a) * ry;
+        return [cx + ex * Math.cos(rot) - ey * Math.sin(rot), cy + ex * Math.sin(rot) + ey * Math.cos(rot)];
+      };
+      const p0 = at(a0);
+      if (cur) cur.pts.push(p0); else startSub(p0[0], p0[1]);
+      for (let i = 1; i <= n; i++) cur.pts.push(at(a0 + d * i / n));
+      last = cur.pts[cur.pts.length - 1];
+    };
+
+    function jitterPath(pts, closed, salt, amp) {
+      real.moveTo(pts[0][0] + (rnd(seed * 13.7 + salt) - 0.5) * amp, pts[0][1] + (rnd(seed * 7.3 + salt) - 0.5) * amp);
+      for (let i = 1; i < pts.length; i++) {
+        const k = i * 3.17 + salt;
+        real.lineTo(pts[i][0] + (rnd(k + seed * 13.7) - 0.5) * 2 * amp, pts[i][1] + (rnd(k * 1.7 + seed * 7.3) - 0.5) * 2 * amp);
+      }
+      if (closed) real.closePath();
+    }
+    function bbox() {
+      let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+      for (const sp of subpaths) for (const [x, y] of sp.pts) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+      return Math.max(x1 - x0, y1 - y0);
+    }
+    function outline() {
+      if (!subpaths.length || real.globalAlpha < 0.5) return;
+      const size = bbox();
+      if (size < 6) return;                             // stars, sparkles, tiny dots stay clean
+      real.save();
+      real.setLineDash([]);
+      real.strokeStyle = INK; real.lineCap = 'round'; real.lineJoin = 'round';
+      const passes = size > 40 ? 2 : 1;
+      for (let p = 0; p < passes; p++) {
+        real.lineWidth = p ? 1.2 : 2.3;
+        real.globalAlpha *= p ? 0.55 : 0.9;
+        real.beginPath();
+        subpaths.forEach((sp, i) => sp.pts.length > 1 && jitterPath(sp.pts, sp.closed, i * 11 + p * 101, WOBBLE));
+        real.stroke();
+      }
+      real.restore();
+    }
+    function sketchStroke() {
+      real.beginPath();
+      subpaths.forEach((sp, i) => sp.pts.length > 1 && jitterPath(sp.pts, sp.closed, i * 11, WOBBLE * 0.8));
+      real.stroke();
+    }
+    const handFont = (f) => f.replace(/"Baloo 2","Nunito",system-ui,sans-serif|"Nunito",system-ui,sans-serif/, HAND_FONT);
+
+    const over = {
+      beginPath() { subpaths = []; cur = null; last = null; real.beginPath(); },
+      moveTo(x, y) { startSub(x, y); real.moveTo(x, y); },
+      lineTo(x, y) { addPt(x, y); real.lineTo(x, y); },
+      closePath() { if (cur) { cur.closed = true; last = cur.pts[0]; } real.closePath(); },
+      rect(x, y, w, h) { startSub(x, y); addPt(x + w, y); addPt(x + w, y + h); addPt(x, y + h); cur.closed = true; real.rect(x, y, w, h); },
+      arc(x, y, r, a0, a1, ccw) { arcPts(x, y, r, r, 0, a0, a1, !!ccw); real.arc(x, y, r, a0, a1, ccw); },
+      ellipse(x, y, rx, ry, rot, a0, a1, ccw) { arcPts(x, y, rx, ry, rot, a0, a1, !!ccw); real.ellipse(x, y, rx, ry, rot, a0, a1, ccw); },
+      quadraticCurveTo(cx, cy, x, y) {
+        if (!last) startSub(cx, cy); else if (!cur) startSub(last[0], last[1]);
+        const [x0, y0] = last;
+        curve((u) => [(1 - u) ** 2 * x0 + 2 * (1 - u) * u * cx + u * u * x, (1 - u) ** 2 * y0 + 2 * (1 - u) * u * cy + u * u * y], 10);
+        real.quadraticCurveTo(cx, cy, x, y);
+      },
+      bezierCurveTo(c1x, c1y, c2x, c2y, x, y) {
+        if (!last) startSub(c1x, c1y); else if (!cur) startSub(last[0], last[1]);
+        const [x0, y0] = last;
+        curve((u) => {
+          const v = 1 - u;
+          return [v ** 3 * x0 + 3 * v * v * u * c1x + 3 * v * u * u * c2x + u ** 3 * x, v ** 3 * y0 + 3 * v * v * u * c1y + 3 * v * u * u * c2y + u ** 3 * y];
+        }, 12);
+        real.bezierCurveTo(c1x, c1y, c2x, c2y, x, y);
+      },
+      arcTo(x1, y1, x2, y2, r) {
+        // approximate the rounded corner with a quadratic through the corner point
+        if (!last) startSub(x1, y1);
+        const [x0, y0] = last;
+        const d1 = Math.hypot(x0 - x1, y0 - y1) || 1, d2 = Math.hypot(x2 - x1, y2 - y1) || 1;
+        const k1 = Math.min(r, d1 / 2), k2 = Math.min(r, d2 / 2);
+        addPt(x1 + (x0 - x1) / d1 * k1, y1 + (y0 - y1) / d1 * k1);
+        const [sx, sy] = last, ex = x1 + (x2 - x1) / d2 * k2, ey = y1 + (y2 - y1) / d2 * k2;
+        curve((u) => [(1 - u) ** 2 * sx + 2 * (1 - u) * u * x1 + u * u * ex, (1 - u) ** 2 * sy + 2 * (1 - u) * u * y1 + u * u * ey], 5);
+        real.arcTo(x1, y1, x2, y2, r);
+      },
+      fill(...a) { real.fill(...a); outline(); },
+      stroke() { sketchStroke(); },
+      fillRect(x, y, w, h) {
+        real.fillRect(x, y, w, h);
+        subpaths = []; cur = null; over.rect(x, y, w, h); real.beginPath(); outline();
+      },
+      strokeRect(x, y, w, h) { subpaths = []; cur = null; over.rect(x, y, w, h); real.beginPath(); sketchStroke(); }
+    };
+
+    return new Proxy(real, {
+      get(target, prop) {
+        if (prop in over) return over[prop];
+        const v = target[prop];
+        return typeof v === 'function' ? v.bind(target) : v;
+      },
+      set(target, prop, value) {
+        if (prop === 'shadowBlur') { target.shadowBlur = 0; return true; }   // no glows in a doodle
+        if (prop === 'font') { target.font = handFont(value); return true; }
+        target[prop] = value;
+        return true;
+      }
+    });
+  }
+
+  // notebook paper: grain + ruled lines + margin, laid over the finished drawing
+  let grain = null;
+  function paperGrain() {
+    if (grain || typeof document === 'undefined') return grain;
+    const c = document.createElement('canvas'); c.width = c.height = 256;
+    const g = c.getContext('2d'); const img = g.createImageData(256, 256);
+    for (let i = 0; i < img.data.length; i += 4) {
+      const v = 225 + rnd(i * 0.37) * 30;
+      img.data[i] = v; img.data[i + 1] = v - 3; img.data[i + 2] = v - 10; img.data[i + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    grain = c;
+    return grain;
+  }
+  function paper(ctx) {
     ctx.save();
-    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(255,250,238,0.26)';                // colored-pencil wash
+    ctx.fillRect(0, 0, W, H);
+    const gr = paperGrain();
+    if (gr) {
+      ctx.globalCompositeOperation = 'multiply';
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = ctx.createPattern(gr, 'repeat');
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+    }
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.strokeStyle = 'rgba(120,160,220,0.28)'; ctx.lineWidth = 1;
+    for (let y = 46; y < H; y += 32) { ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke(); }
+    ctx.strokeStyle = 'rgba(230,90,90,0.35)'; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(64, 0); ctx.lineTo(64, H); ctx.stroke();
+    ctx.restore();
+  }
+
+  function renderFrame(ctx, st, t, meta, style = 'doodle') {
+    const real = ctx;
+    if (style === 'doodle') {
+      t = Math.floor(t * DRAW_FPS) / DRAW_FPS;                // animate "on twos" like hand-drawn cartoons
+      ctx = doodleContext(real, Math.floor(t * BOIL_FPS));
+    }
+    real.save();
+    real.clearRect(0, 0, W, H);
     (scenes[st.scene] || scenes.everyday)(ctx, t, st);
     moodOverlay(ctx, st);
+    if (style === 'doodle') paper(real);
     captionBar(ctx, st, t, meta);
+    ctx = real;
     // fade in / out for a clean loop
     const fade = Math.min(clamp(t / 0.4, 0, 1), clamp((DUR - t) / 0.4, 0, 1));
     if (fade < 1) { ctx.fillStyle = `rgba(10,10,20,${1 - fade})`; ctx.fillRect(0, 0, W, H); }
@@ -1076,6 +1251,7 @@
       canvas.width = W * this.scale;
       canvas.height = H * this.scale;
       this.ctx = canvas.getContext('2d');
+      this.style = opts.style || 'doodle';         // 'doodle' (hand-drawn) or 'classic'
       this.story = null; this.meta = null;
       this.start = 0; this.raf = 0; this.playing = false;
       this._tick = this._tick.bind(this);
@@ -1087,7 +1263,7 @@
     drawAt(t) {
       if (!this.story) return;
       this.ctx.setTransform(this.scale, 0, 0, this.scale, 0, 0);
-      renderFrame(this.ctx, this.story, t, this.meta);
+      renderFrame(this.ctx, this.story, t, this.meta, this.style);
     }
     _tick(now) {
       if (!this.playing) return;

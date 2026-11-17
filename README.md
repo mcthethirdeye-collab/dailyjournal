@@ -1,12 +1,13 @@
 # 🎞️ Daily Reel — a journal that animates your day
 
 Write a journal entry and Daily Reel finds the **main event** of your day and turns it into a short,
-looping **mini animation**: a cartoon you, the people you were with, the place, the weather, and your mood.
+looping **hand-drawn doodle animation**, like a sketch in the margin of your notebook: a cartoon you, the people you were with, the place, the weather, and your mood.
 
 ## Features
 
 - **Journal**: write, edit, search and delete dated entries. Everything is saved in your browser (`localStorage`). Nothing is uploaded.
 - **Main-event detection**: each sentence is scored on event words ("finally", "won", "met"…), emotion, intensity and exclamation marks. The strongest one becomes the headline and the caption.
+- **Doodle style**: wobbly ink outlines that shimmer from frame to frame, a choppier hand-drawn frame rate, handwritten captions and notebook paper.
 - **23 animated scenes**: birthday/party, wedding, beach, rain, snow, work, study, running, sports, big win,
   food, concert, travel, road trip, love/date, pets, hiking, sick day, rest/sleep, friends, gaming, shopping, everyday.
 - **Smart details**:
@@ -46,7 +47,7 @@ node --test tests/*.test.js
 | `index.html` | App shell |
 | `css/styles.css` | Styles (light and dark mode, responsive) |
 | `js/analyzer.js` | Turns entry text into a story: scene, main event, mood, time, people, props |
-| `js/animator.js` | Canvas renderer: character, 23 scenes, caption, loop and video recording |
+| `js/animator.js` | Canvas renderer: character, 23 scenes, doodle style, caption, loop and video recording |
 | `js/app.js` | UI, storage, reel playback, export/import |
 | `tests/analyzer.test.js` | Analyzer unit tests |
 
