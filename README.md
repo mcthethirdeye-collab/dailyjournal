@@ -1,13 +1,13 @@
 # 🎞️ Daily Reel — a journal that animates your day
 
 Write a journal entry and Daily Reel finds the **main event** of your day and turns it into a short,
-looping **hand-drawn doodle animation**, like a sketch in the margin of your notebook: a cartoon you, the people you were with, the place, the weather, and your mood.
+looping **black-and-white doodle animation**, like a sketch in the margin of your notebook: a cartoon you, the people you were with, the place, the weather, and your mood.
 
 ## Features
 
 - **Journal**: write, edit, search and delete dated entries. Everything is saved in your browser (`localStorage`). Nothing is uploaded.
 - **Main-event detection**: each sentence is scored on event words ("finally", "won", "met"…), emotion, intensity and exclamation marks. The strongest one becomes the headline and the caption.
-- **Doodle style**: wobbly ink outlines that shimmer from frame to frame, a choppier hand-drawn frame rate, handwritten captions and notebook paper.
+- **Black-and-white doodle style**: everything is drawn in pen on notebook paper. Light colours become paper, mid tones become hatching, dark ones become solid ink, and emoji props are traced into line art. Lines wobble and shimmer from frame to frame, at a choppier hand-drawn frame rate, with handwritten captions.
 - **23 animated scenes**: birthday/party, wedding, beach, rain, snow, work, study, running, sports, big win,
   food, concert, travel, road trip, love/date, pets, hiking, sick day, rest/sleep, friends, gaming, shopping, everyday.
 - **Smart details**:

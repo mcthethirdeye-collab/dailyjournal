@@ -1068,7 +1068,72 @@
   const INK = '#2a2433';
   const BOIL_FPS = 6, DRAW_FPS = 12, WOBBLE = 1.7, SEG = 18;
 
-  function doodleContext(real, seed) {
+  // ---- black-and-white ink helpers ----
+  const PAPER = '#fffdf8';
+  function parseColor(c) {
+    if (typeof c !== 'string') return { lum: 1, alpha: 1, grad: true };
+    let r, g, b, a = 1, m;
+    if ((m = c.match(/^#([0-9a-f]{6})$/i))) { const n = parseInt(m[1], 16); r = n >> 16; g = (n >> 8) & 255; b = n & 255; }
+    else if ((m = c.match(/rgba?\(([^)]+)\)/))) { [r, g, b, a = 1] = m[1].split(',').map(Number); }
+    else return { lum: 1, alpha: 1 };
+    return { lum: (0.299 * r + 0.587 * g + 0.114 * b) / 255, alpha: a };
+  }
+  let hatchCanvas = null;
+  function hatch(real) {
+    if (!hatchCanvas) {
+      if (typeof document === 'undefined') return INK;
+      hatchCanvas = document.createElement('canvas'); hatchCanvas.width = hatchCanvas.height = 9;
+      const g = hatchCanvas.getContext('2d');
+      g.fillStyle = PAPER; g.fillRect(0, 0, 9, 9);
+      g.strokeStyle = INK; g.lineWidth = 1.3;
+      g.beginPath(); g.moveTo(-1, 10); g.lineTo(10, -1); g.moveTo(-1, 1); g.lineTo(1, -1); g.moveTo(8, 10); g.lineTo(10, 8); g.stroke();
+    }
+    return real.createPattern(hatchCanvas, 'repeat');
+  }
+  // Emoji are traced into ink line art: edges of the glyph become pen lines, insides become paper.
+  const emojiCache = new Map();
+  function emojiArt(ch, px) {
+    if (typeof document === 'undefined') return null;
+    const size = Math.max(8, Math.round(px / 4) * 4);
+    const key = ch + '|' + size;
+    if (emojiCache.has(key)) return emojiCache.get(key);
+    if (emojiCache.size > 400) emojiCache.clear();
+    const k = 2, dim = Math.ceil(size * 1.5 * k);
+    const c = document.createElement('canvas'); c.width = c.height = dim;
+    const g = c.getContext('2d', { willReadFrequently: true });
+    g.font = `${size * k}px ${EMOJI_FONT}`; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText(ch, dim / 2, dim / 2);
+    const src = g.getImageData(0, 0, dim, dim), d = src.data, n = dim * dim;
+    const L = new Float32Array(n), A = new Float32Array(n);
+    for (let i = 0; i < n; i++) {
+      const a = d[i * 4 + 3] / 255;
+      A[i] = a;
+      L[i] = ((0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255) * a + (1 - a);
+    }
+    const out = g.createImageData(dim, dim), o = out.data;
+    const ink = [42, 36, 51], pap = [255, 253, 248];
+    for (let y = 1; y < dim - 1; y++) for (let x = 1; x < dim - 1; x++) {
+      const i = y * dim + x;
+      const sob = (F) => {
+        const gx = F[i - dim + 1] + 2 * F[i + 1] + F[i + dim + 1] - F[i - dim - 1] - 2 * F[i - 1] - F[i + dim - 1];
+        const gy = F[i + dim - 1] + 2 * F[i + dim] + F[i + dim + 1] - F[i - dim - 1] - 2 * F[i - dim] - F[i - dim + 1];
+        return Math.hypot(gx, gy);
+      };
+      const edge = Math.max(sob(L) * 0.9, sob(A));
+      let inkA = clamp((edge - 0.35) / 0.4, 0, 1);
+      if (A[i] > 0.5 && L[i] < 0.18) inkA = 1;
+      const j = i * 4;
+      if (inkA > 0.05) { o[j] = ink[0]; o[j + 1] = ink[1]; o[j + 2] = ink[2]; o[j + 3] = 255 * Math.max(inkA, A[i] > 0.5 ? 1 : 0) | 0; if (A[i] > 0.5 && inkA < 1) { o[j] = lerp(pap[0], ink[0], inkA); o[j + 1] = lerp(pap[1], ink[1], inkA); o[j + 2] = lerp(pap[2], ink[2], inkA); } }
+      else if (A[i] > 0.5) { o[j] = pap[0]; o[j + 1] = pap[1]; o[j + 2] = pap[2]; o[j + 3] = 255; }
+    }
+    g.putImageData(out, 0, 0);
+    const res = { canvas: c, size, k };
+    emojiCache.set(key, res);
+    return res;
+  }
+
+  function doodleContext(real, seed, mono = true) {
+    let ui = false;
     let subpaths = [], cur = null, last = [0, 0];
     const startSub = (x, y) => { cur = { pts: [[x, y]], closed: false }; subpaths.push(cur); last = [x, y]; };
     const addPt = (x, y) => {
@@ -1130,6 +1195,37 @@
       subpaths.forEach((sp, i) => sp.pts.length > 1 && jitterPath(sp.pts, sp.closed, i * 11, WOBBLE * 0.8));
       real.stroke();
     }
+    // Turns a coloured fill into ink: light -> paper, mid tones -> hatching, very dark -> solid ink.
+    function paintFill(doFill) {
+      if (!mono) { doFill(); outline(); return; }
+      const c = parseColor(real.fillStyle);
+      const size = bbox();
+      real.save();
+      if (ui) { real.fillStyle = PAPER; real.globalAlpha = 1; doFill(); real.restore(); outline(); return; }
+      // tints, glows, light beams and see-through panels disappear (only full-width gradients like sky/sea stay, as paper)
+      if (c.alpha < 0.5 || (c.grad && size < W * 0.8)) { real.restore(); return; }
+      if (size < 6) real.fillStyle = INK;                       // tiny dots become pen dots
+      else if (size > W * 0.8 || c.grad || c.lum >= 0.55) real.fillStyle = PAPER;
+      else if (c.lum < 0.2) real.fillStyle = INK;
+      else real.fillStyle = hatch(real);
+      doFill();
+      real.restore();
+      outline();
+    }
+    function monoStroke() {
+      const c = parseColor(real.strokeStyle);
+      const w = real.lineWidth;
+      real.save();
+      real.globalAlpha *= Math.min(1, c.alpha * 1.2);
+      if (c.lum < 0.35 || w < 4) {
+        real.strokeStyle = INK; real.lineWidth = c.lum < 0.35 ? w : Math.min(w, 2.2);
+        sketchStroke();
+      } else {                                                  // thick light line -> outlined tube
+        real.strokeStyle = INK; real.lineWidth = w + 2.5; sketchStroke();
+        real.strokeStyle = PAPER; real.lineWidth = Math.max(1, w - 1.5); sketchStroke();
+      }
+      real.restore();
+    }
     const handFont = (f) => f.replace(/"Baloo 2","Nunito",system-ui,sans-serif|"Nunito",system-ui,sans-serif/, HAND_FONT);
 
     const over = {
@@ -1166,13 +1262,29 @@
         curve((u) => [(1 - u) ** 2 * sx + 2 * (1 - u) * u * x1 + u * u * ex, (1 - u) ** 2 * sy + 2 * (1 - u) * u * y1 + u * u * ey], 5);
         real.arcTo(x1, y1, x2, y2, r);
       },
-      fill(...a) { real.fill(...a); outline(); },
-      stroke() { sketchStroke(); },
-      fillRect(x, y, w, h) {
-        real.fillRect(x, y, w, h);
-        subpaths = []; cur = null; over.rect(x, y, w, h); real.beginPath(); outline();
+      fill(...a) { paintFill(() => real.fill(...a)); },
+      stroke() { mono ? monoStroke() : sketchStroke(); },
+      fillText(str, x, y, mw) {
+        if (!mono) return real.fillText(str, x, y, mw);
+        if (/Emoji/.test(real.font)) {
+          const px = parseFloat((real.font.match(/([\d.]+)px/) || [0, 0])[1]);
+          const art = px > 0 && emojiArt(str, px);
+          if (!art) return;
+          const f = px / art.size, w = art.canvas.width / art.k * f;
+          real.drawImage(art.canvas, x - w / 2, y - w / 2, w, w);
+          return;
+        }
+        real.save(); real.fillStyle = INK; real.fillText(str, x, y, mw); real.restore();
       },
-      strokeRect(x, y, w, h) { subpaths = []; cur = null; over.rect(x, y, w, h); real.beginPath(); sketchStroke(); }
+      strokeText(str, x, y, mw) {
+        if (!mono) return real.strokeText(str, x, y, mw);
+        real.save(); real.strokeStyle = PAPER; real.strokeText(str, x, y, mw); real.restore();
+      },
+      fillRect(x, y, w, h) {
+        subpaths = []; cur = null; over.rect(x, y, w, h); real.beginPath();
+        paintFill(() => real.fillRect(x, y, w, h));
+      },
+      strokeRect(x, y, w, h) { subpaths = []; cur = null; over.rect(x, y, w, h); real.beginPath(); mono ? monoStroke() : sketchStroke(); }
     };
 
     return new Proxy(real, {
@@ -1184,6 +1296,7 @@
       set(target, prop, value) {
         if (prop === 'shadowBlur') { target.shadowBlur = 0; return true; }   // no glows in a doodle
         if (prop === 'font') { target.font = handFont(value); return true; }
+        if (prop === '__ui') { ui = !!value; return true; }
         target[prop] = value;
         return true;
       }
@@ -1198,7 +1311,7 @@
     const g = c.getContext('2d'); const img = g.createImageData(256, 256);
     for (let i = 0; i < img.data.length; i += 4) {
       const v = 225 + rnd(i * 0.37) * 30;
-      img.data[i] = v; img.data[i + 1] = v - 3; img.data[i + 2] = v - 10; img.data[i + 3] = 255;
+      img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v - 2; img.data[i + 3] = 255;
     }
     g.putImageData(img, 0, 0);
     grain = c;
@@ -1206,20 +1319,18 @@
   }
   function paper(ctx) {
     ctx.save();
-    ctx.fillStyle = 'rgba(255,250,238,0.26)';                // colored-pencil wash
-    ctx.fillRect(0, 0, W, H);
     const gr = paperGrain();
     if (gr) {
       ctx.globalCompositeOperation = 'multiply';
-      ctx.globalAlpha = 0.5;
+      ctx.globalAlpha = 0.35;
       ctx.fillStyle = ctx.createPattern(gr, 'repeat');
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
     }
     ctx.globalCompositeOperation = 'multiply';
-    ctx.strokeStyle = 'rgba(120,160,220,0.28)'; ctx.lineWidth = 1;
+    ctx.strokeStyle = 'rgba(120,120,130,0.22)'; ctx.lineWidth = 1;
     for (let y = 46; y < H; y += 32) { ctx.beginPath(); ctx.moveTo(0, y + 0.5); ctx.lineTo(W, y + 0.5); ctx.stroke(); }
-    ctx.strokeStyle = 'rgba(230,90,90,0.35)'; ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(120,120,130,0.3)'; ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.moveTo(64, 0); ctx.lineTo(64, H); ctx.stroke();
     ctx.restore();
   }
@@ -1235,6 +1346,7 @@
     (scenes[st.scene] || scenes.everyday)(ctx, t, st);
     moodOverlay(ctx, st);
     if (style === 'doodle') paper(real);
+    ctx.__ui = true;
     captionBar(ctx, st, t, meta);
     ctx = real;
     // fade in / out for a clean loop
