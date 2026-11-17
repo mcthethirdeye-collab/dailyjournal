@@ -129,8 +129,9 @@
   }
 
   // ---------- actions ----------
-  function newEntry() {
+  function newEntry(focus = true) {
     stopReel();
+    disarmDelete();
     currentId = null;
     els.date.value = today();
     els.text.value = '';
@@ -139,11 +140,12 @@
     els.saveState.textContent = '';
     renderList();
     previewFromEditor();
-    els.text.focus();
+    if (focus === true) els.text.focus({ preventScroll: true });
   }
 
   function openEntry(id) {
     stopReel();
+    disarmDelete();
     const e = entries.find((x) => x.id === id);
     if (!e) return;
     currentId = id;
@@ -171,9 +173,17 @@
     previewFromEditor();
   }
 
+  // Two-step delete built into the page (browser confirm() dialogs are blocked in some embeds).
+  let deleteArmed = 0;
+  function disarmDelete() { clearTimeout(deleteArmed); deleteArmed = 0; els.del.textContent = 'Delete'; }
   function deleteEntry() {
     if (!currentId) return;
-    if (!confirm('Delete this entry? This cannot be undone.')) return;
+    if (!deleteArmed) {
+      els.del.textContent = 'Tap again to delete';
+      deleteArmed = setTimeout(disarmDelete, 3000);
+      return;
+    }
+    disarmDelete();
     entries = entries.filter((e) => e.id !== currentId);
     persist();
     toast('Entry deleted');
@@ -272,6 +282,7 @@
   function closeMenu() { els.menu.hidden = true; els.menuBtn.setAttribute('aria-expanded', 'false'); }
 
   // ---------- wiring ----------
+  if (window.DAILYREEL_EMBED) { els.download.hidden = true; els.exportBtn.hidden = true; }
   fillSceneSelect();
   els.form.addEventListener('submit', saveEntry);
   els.newBtn.addEventListener('click', newEntry);
@@ -306,7 +317,7 @@
     const latest = [...entries].sort((a, b) => (b.date + b.createdAt).localeCompare(a.date + a.createdAt))[0];
     openEntry(latest.id);
   } else {
-    newEntry();
+    newEntry(false);
     els.text.value = EXAMPLES[0];
     els.saveState.textContent = 'Example — save it to keep it';
     previewFromEditor();
