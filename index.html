@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Daily Reel Journal</title>
+  <meta name="description" content="A journal that draws each entry as a black-and-white doodle, word by word.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;800&family=Patrick+Hand&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🎞️</span>
+      <div>
+        <h1>Daily Reel</h1>
+        <p class="tagline">Write your day. Watch it play.</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button id="playAllBtn" class="btn ghost" title="Play every entry as one reel">▶ Play my reel</button>
+      <button id="menuBtn" class="btn ghost icon" aria-haspopup="true" aria-expanded="false" title="More">⋯</button>
+      <div id="menu" class="menu" hidden>
+        <button id="exportBtn">Export entries (JSON)</button>
+        <label class="menu-item">Import entries<input id="importInput" type="file" accept="application/json" hidden></label>
+      </div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <aside class="sidebar" aria-label="Journal entries">
+      <button id="newBtn" class="btn primary block">＋ New entry</button>
+      <input id="search" class="search" type="search" placeholder="Search entries…" aria-label="Search entries">
+      <ul id="entryList" class="entry-list"></ul>
+      <p id="emptyList" class="muted small" hidden>No entries yet. Write your first one!</p>
+    </aside>
+
+    <section class="workspace">
+      <div class="player card">
+        <div class="stage">
+          <canvas id="stage" aria-label="Animation of the main event"></canvas>
+          <div id="reelBadge" class="reel-badge" hidden></div>
+        </div>
+        <div class="player-bar">
+          <div class="chips" id="chips"></div>
+          <div class="player-actions">
+            <button id="replayBtn" class="btn ghost small" title="Replay">↻ Replay</button>
+            <button id="downloadBtn" class="btn ghost small" title="Save this animation as a video">⬇ Video</button>
+          </div>
+        </div>
+        <p class="main-event muted" id="mainEvent">—</p>
+      </div>
+
+      <form id="editor" class="editor card" autocomplete="off">
+        <div class="editor-head">
+          <input id="date" type="date" class="date" aria-label="Entry date" required>
+        </div>
+        <textarea id="text" rows="7" placeholder="How was your day? What was the big moment?&#10;&#10;e.g. “Sarah threw me a surprise birthday party with a chocolate cake! Best night ever.”" aria-label="Journal entry"></textarea>
+        <div class="editor-foot">
+          <button type="button" id="exampleBtn" class="btn ghost small">✨ Try an example</button>
+          <span id="saveState" class="muted small" aria-live="polite"></span>
+          <span class="spacer"></span>
+          <button type="button" id="deleteBtn" class="btn danger small" hidden>Delete</button>
+          <button type="submit" id="saveBtn" class="btn primary">Save & animate</button>
+        </div>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script src="js/analyzer.js"></script>
+  <script src="js/lexicon.js"></script>
+  <script src="js/storyboard.js"></script>
+  <script src="js/animator.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
